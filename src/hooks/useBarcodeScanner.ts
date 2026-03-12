@@ -1,5 +1,12 @@
 import { useRef, useCallback, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import {
+  captureFrame,
+  enhanceForBarcode,
+  canvasToFile,
+  rotateCanvas,
+  averageBrightness,
+} from '../utils/barcodeImageEnhancer';
 
 const SUPPORTED_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -16,7 +23,18 @@ const SUPPORTED_FORMATS = [
   Html5QrcodeSupportedFormats.PDF_417,
 ];
 
-interface UseBarcodeScanner {
+const BARCODE_DETECTOR_FORMATS = [
+  'qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e',
+  'code_128', 'code_39', 'code_93', 'itf', 'codabar',
+  'data_matrix', 'pdf417',
+] as const;
+
+const ENHANCED_DECODE_MS = 250;
+const LOW_BRIGHTNESS_THRESHOLD = 55;
+const BRIGHTNESS_CHECK_MS = 2000;
+const DUPLICATE_SUPPRESS_MS = 2000;
+
+export interface UseBarcodeScanner {
   start: (elementId: string) => Promise<void>;
   stop: () => Promise<void>;
   isScanning: boolean;
@@ -24,6 +42,7 @@ interface UseBarcodeScanner {
   torchOn: boolean;
   torchSupported: boolean;
   toggleTorch: () => Promise<void>;
+  scanStartedAt: number | null;
 }
 
 function parsePermissionError(err: unknown): string {
@@ -40,17 +59,80 @@ function parsePermissionError(err: unknown): string {
   return msg || 'Failed to start scanner';
 }
 
+function getVideoElement(elementId: string): HTMLVideoElement | null {
+  return document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
+}
+
+async function tryDecodeCanvas(
+  canvas: HTMLCanvasElement,
+  detector: BarcodeDetector | null,
+  fallbackScanner: Html5Qrcode | null,
+): Promise<string | null> {
+  if (detector) {
+    try {
+      const results = await detector.detect(canvas);
+      if (results.length > 0 && results[0].rawValue) return results[0].rawValue;
+    } catch { /* non-fatal */ }
+    return null;
+  }
+
+  if (fallbackScanner) {
+    try {
+      const file = await canvasToFile(canvas);
+      return await fallbackScanner.scanFile(file, false);
+    } catch { /* no barcode found */ }
+  }
+  return null;
+}
+
 export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcodeScanner {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const enhancedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const brightnessTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const enhancedScannerRef = useRef<Html5Qrcode | null>(null);
+  const enhancedElRef = useRef<HTMLDivElement | null>(null);
+  const decodingRef = useRef(false);
+  const lastDecodedRef = useRef<{ text: string; time: number } | null>(null);
+
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [scanStartedAt, setScanStartedAt] = useState<number | null>(null);
+
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
+  const torchOnRef = useRef(torchOn);
+  torchOnRef.current = torchOn;
+
+  const emitDeduplicated = useCallback((text: string) => {
+    const now = Date.now();
+    const last = lastDecodedRef.current;
+    if (last && last.text === text && now - last.time < DUPLICATE_SUPPRESS_MS) return;
+    lastDecodedRef.current = { text, time: now };
+    onScanRef.current(text);
+  }, []);
+
+  const cleanupEnhancedPipeline = useCallback(() => {
+    if (enhancedTimerRef.current) {
+      clearInterval(enhancedTimerRef.current);
+      enhancedTimerRef.current = null;
+    }
+    if (brightnessTimerRef.current) {
+      clearInterval(brightnessTimerRef.current);
+      brightnessTimerRef.current = null;
+    }
+    enhancedScannerRef.current = null;
+    if (enhancedElRef.current) {
+      enhancedElRef.current.remove();
+      enhancedElRef.current = null;
+    }
+    decodingRef.current = false;
+  }, []);
 
   const stop = useCallback(async () => {
+    cleanupEnhancedPipeline();
     if (scannerRef.current) {
       try {
         const state = scannerRef.current.getState();
@@ -65,8 +147,114 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
       setIsScanning(false);
       setTorchOn(false);
       setTorchSupported(false);
+      setScanStartedAt(null);
+    }
+  }, [cleanupEnhancedPipeline]);
+
+  const applyAdvancedTrackConstraints = useCallback(async (track: MediaStreamTrack) => {
+    try {
+      const caps = track.getCapabilities?.() as Record<string, unknown> | undefined;
+      const advanced: Record<string, unknown> = {};
+      if (caps?.focusMode) advanced.focusMode = 'continuous';
+      if (caps?.exposureMode) advanced.exposureMode = 'continuous';
+      if (caps?.whiteBalanceMode) advanced.whiteBalanceMode = 'continuous';
+      if (Object.keys(advanced).length > 0) {
+        await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
+      }
+    } catch {
+      // Not all browsers/devices support these constraints
     }
   }, []);
+
+  const enableTorch = useCallback(async () => {
+    const track = trackRef.current;
+    if (!track || torchOnRef.current) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: true } as MediaTrackConstraintSet] });
+      setTorchOn(true);
+    } catch {
+      // torch not available
+    }
+  }, []);
+
+  const startEnhancedPipeline = useCallback((elementId: string) => {
+    let detector: BarcodeDetector | null = null;
+    if ('BarcodeDetector' in window) {
+      try {
+        detector = new BarcodeDetector({ formats: [...BARCODE_DETECTOR_FORMATS] });
+      } catch { /* BarcodeDetector unavailable or unsupported formats */ }
+    }
+
+    if (!detector) {
+      const el = document.createElement('div');
+      el.id = 'enhanced-scanner-hidden';
+      el.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;';
+      document.body.appendChild(el);
+      enhancedElRef.current = el;
+      try {
+        enhancedScannerRef.current = new Html5Qrcode('enhanced-scanner-hidden', {
+          formatsToSupport: SUPPORTED_FORMATS,
+          verbose: false,
+        });
+      } catch {
+        return;
+      }
+    }
+
+    let frameCount = 0;
+
+    enhancedTimerRef.current = setInterval(async () => {
+      if (decodingRef.current) return;
+      decodingRef.current = true;
+
+      try {
+        const video = getVideoElement(elementId);
+        if (!video || video.readyState < 2) return;
+
+        const frame = captureFrame(video);
+        if (!frame) return;
+        enhanceForBarcode(frame);
+
+        const decoded = await tryDecodeCanvas(frame, detector, enhancedScannerRef.current);
+        if (decoded) {
+          emitDeduplicated(decoded);
+          return;
+        }
+
+        // Try slight rotations every 4th frame (~1/sec) for curved barcodes
+        frameCount++;
+        if (frameCount % 4 === 0) {
+          for (const angle of [2, -2, 4, -4]) {
+            const rotated = rotateCanvas(frame, angle);
+            const result = await tryDecodeCanvas(rotated, detector, enhancedScannerRef.current);
+            if (result) {
+              emitDeduplicated(result);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Enhanced pipeline errors are non-fatal
+      } finally {
+        decodingRef.current = false;
+      }
+    }, ENHANCED_DECODE_MS);
+
+    brightnessTimerRef.current = setInterval(() => {
+      if (torchOnRef.current) {
+        if (brightnessTimerRef.current) {
+          clearInterval(brightnessTimerRef.current);
+          brightnessTimerRef.current = null;
+        }
+        return;
+      }
+      const video = getVideoElement(elementId);
+      if (!video || video.readyState < 2) return;
+      if (averageBrightness(video) < LOW_BRIGHTNESS_THRESHOLD) {
+        enableTorch();
+      }
+    }, BRIGHTNESS_CHECK_MS);
+  }, [emitDeduplicated, enableTorch]);
 
   const start = useCallback(
     async (elementId: string) => {
@@ -83,36 +271,43 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
         await scanner.start(
           { facingMode: 'environment' },
           {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
+            fps: 15,
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
+              width: Math.min(Math.floor(viewfinderWidth * 0.9), 420),
+              height: Math.min(Math.floor(viewfinderHeight * 0.35), 120),
+            }),
             aspectRatio: 1.777,
+            disableFlip: true,
           },
           (decodedText) => {
-            onScanRef.current(decodedText);
+            emitDeduplicated(decodedText);
           },
           () => {},
         );
         setIsScanning(true);
+        setScanStartedAt(Date.now());
 
-        // Detect torch support from the scanner's video track
         try {
-          const videoEl = document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
+          const videoEl = getVideoElement(elementId);
           const stream = videoEl?.srcObject as MediaStream | null;
           const track = stream?.getVideoTracks()[0] ?? null;
           trackRef.current = track;
           if (track) {
             const caps = track.getCapabilities?.() as Record<string, unknown> | undefined;
             setTorchSupported(!!caps?.torch);
+            await applyAdvancedTrackConstraints(track);
           }
         } catch {
           setTorchSupported(false);
         }
+
+        startEnhancedPipeline(elementId);
       } catch (err) {
         setError(parsePermissionError(err));
         setIsScanning(false);
       }
     },
-    [stop],
+    [stop, emitDeduplicated, applyAdvancedTrackConstraints, startEnhancedPipeline],
   );
 
   const toggleTorch = useCallback(async () => {
@@ -127,5 +322,5 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
     }
   }, [torchOn]);
 
-  return { start, stop, isScanning, error, torchOn, torchSupported, toggleTorch };
+  return { start, stop, isScanning, error, torchOn, torchSupported, toggleTorch, scanStartedAt };
 }

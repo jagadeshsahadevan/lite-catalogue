@@ -4,14 +4,27 @@ import { ManualBarcodeInput } from './ManualBarcodeInput';
 import { MD3Button } from './md3/MD3Button';
 import { Icon } from './md3/Icon';
 
+const SCANNING_TIPS = [
+  'Having trouble? Try holding the product flat and steady.',
+  'Move to a well-lit area, or tap the flash icon.',
+  'Try tilting the product slightly to reduce glare on the barcode.',
+];
+
+const TIP_THRESHOLDS_S = [5, 10, 15];
+
 interface Props {
   onScan: (barcode: string) => void;
 }
 
 export function BarcodeScanner({ onScan }: Props) {
   const [manual, setManual] = useState(false);
-  const { start, stop, isScanning, error, torchOn, torchSupported, toggleTorch } = useBarcodeScanner(onScan);
+  const {
+    start, stop, isScanning, error,
+    torchOn, torchSupported, toggleTorch,
+    scanStartedAt,
+  } = useBarcodeScanner(onScan);
   const mountedRef = useRef(false);
+  const [tipIndex, setTipIndex] = useState(-1);
 
   useEffect(() => {
     if (!manual && !mountedRef.current) {
@@ -32,6 +45,22 @@ export function BarcodeScanner({ onScan }: Props) {
       }
     };
   }, [manual, start, stop]);
+
+  useEffect(() => {
+    if (!isScanning || !scanStartedAt) {
+      setTipIndex(-1);
+      return;
+    }
+    const timer = setInterval(() => {
+      const elapsed = (Date.now() - scanStartedAt) / 1000;
+      let idx = -1;
+      for (let i = TIP_THRESHOLDS_S.length - 1; i >= 0; i--) {
+        if (elapsed >= TIP_THRESHOLDS_S[i]) { idx = i; break; }
+      }
+      setTipIndex(idx);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isScanning, scanStartedAt]);
 
   if (manual) {
     return (
@@ -93,6 +122,12 @@ export function BarcodeScanner({ onScan }: Props) {
 
       {!isScanning && !error && (
         <div className="text-on-surface-variant text-sm">Starting camera...</div>
+      )}
+
+      {tipIndex >= 0 && (
+        <div className="w-full max-w-sm text-center text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-[var(--md-shape-sm)] animate-fade-in">
+          {SCANNING_TIPS[tipIndex]}
+        </div>
       )}
 
       <button

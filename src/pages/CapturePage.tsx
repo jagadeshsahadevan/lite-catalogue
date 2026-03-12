@@ -526,18 +526,13 @@ export function CapturePage() {
               onCapture={handleCapture}
               label={getPhotoLabel()}
               bottomSlot={tagIndicator}
+              onDone={
+                (captureMode === 'front-back' || captureMode === 'front-back-more') && state.images.length > 0
+                  ? handleDoneAdding
+                  : null
+              }
+              doneLabel={`Done (${state.images.length})`}
             />
-
-            {captureMode === 'front-back-more' && state.images.length > 0 && (
-              <div className="max-w-sm mx-auto w-full flex-shrink-0 pt-1">
-                <MD3Button variant="filled" fullWidth onClick={handleDoneAdding}>
-                  <span className="flex items-center justify-center gap-2">
-                    <Icon name="check" size={18} />
-                    Done ({state.images.length} photos)
-                  </span>
-                </MD3Button>
-              </div>
-            )}
           </div>
         )}
 
