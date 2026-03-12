@@ -4,7 +4,6 @@ import { useSettings } from '../context/SettingsContext';
 import { MD3Button } from '../components/md3/MD3Button';
 import { MD3Card } from '../components/md3/MD3Card';
 import { MD3Switch } from '../components/md3/MD3Switch';
-import { MD3TextField } from '../components/md3/MD3TextField';
 import type { CaptureMode } from '../types';
 
 const modeOptions: { value: CaptureMode; label: string; desc: string }[] = [
@@ -18,13 +17,10 @@ export function SetupPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<CaptureMode>(settings.captureMode);
   const [askMrp, setAskMrp] = useState(settings.askMrp);
-  const [apiEndpoint, setApiEndpoint] = useState(settings.apiEndpoint);
-
   const handleSave = async () => {
     await updateSettings({
       captureMode: mode,
       askMrp,
-      apiEndpoint: apiEndpoint.trim(),
       setupComplete: true,
     });
     navigate('/capture');
@@ -66,15 +62,6 @@ export function SetupPage() {
             <MD3Switch checked={askMrp} onChange={setAskMrp} />
           </div>
         </MD3Card>
-
-        {/* API Endpoint */}
-        <MD3TextField
-          label="API Endpoint (optional)"
-          value={apiEndpoint}
-          onChange={setApiEndpoint}
-          placeholder="https://api.example.com"
-          type="url"
-        />
 
         <MD3Button variant="filled" fullWidth onClick={handleSave}>
           Get Started
