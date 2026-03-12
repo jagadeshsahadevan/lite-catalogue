@@ -16,12 +16,95 @@ const modeOptions: { value: CaptureMode; label: string }[] = [
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings();
   const [whyOpen, setWhyOpen] = useState(false);
+  const [editingField, setEditingField] = useState<'phone' | 'brand' | null>(null);
+  const [fieldValue, setFieldValue] = useState('');
+
+  const startEdit = (field: 'phone' | 'brand') => {
+    setFieldValue(field === 'phone' ? settings.phoneNumber : settings.brandName);
+    setEditingField(field);
+  };
+
+  const saveField = () => {
+    if (!editingField) return;
+    const key = editingField === 'phone' ? 'phoneNumber' : 'brandName';
+    updateSettings({ [key]: fieldValue.trim() });
+    setEditingField(null);
+  };
 
   return (
     <div>
       <MD3TopBar title="Settings" />
 
       <div className="p-4 space-y-6 max-w-sm mx-auto">
+        {/* Profile */}
+        <section className="space-y-2">
+          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Profile</p>
+          <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
+            {/* Phone Number */}
+            <div className="px-4 py-3">
+              {editingField === 'phone' ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    autoFocus
+                    value={fieldValue}
+                    onChange={(e) => setFieldValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveField()}
+                    className="flex-1 text-sm text-on-surface bg-transparent border-b-2 border-primary py-1 focus:outline-none"
+                    placeholder="Mobile number"
+                  />
+                  <button onClick={saveField} className="p-1">
+                    <Icon name="check" size={20} className="text-primary" />
+                  </button>
+                  <button onClick={() => setEditingField(null)} className="p-1">
+                    <Icon name="close" size={20} className="text-on-surface-variant" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => startEdit('phone')} className="w-full flex items-center justify-between text-left">
+                  <div>
+                    <p className="text-xs text-on-surface-variant">Mobile Number</p>
+                    <p className="text-sm text-on-surface">{settings.phoneNumber || '—'}</p>
+                  </div>
+                  <Icon name="edit" size={18} className="text-on-surface-variant" />
+                </button>
+              )}
+            </div>
+
+            {/* Brand Name */}
+            <div className="px-4 py-3">
+              {editingField === 'brand' ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={fieldValue}
+                    onChange={(e) => setFieldValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveField()}
+                    className="flex-1 text-sm text-on-surface bg-transparent border-b-2 border-primary py-1 focus:outline-none"
+                    placeholder="Brand / store name"
+                  />
+                  <button onClick={saveField} className="p-1">
+                    <Icon name="check" size={20} className="text-primary" />
+                  </button>
+                  <button onClick={() => setEditingField(null)} className="p-1">
+                    <Icon name="close" size={20} className="text-on-surface-variant" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => startEdit('brand')} className="w-full flex items-center justify-between text-left">
+                  <div>
+                    <p className="text-xs text-on-surface-variant">Brand / Store Name</p>
+                    <p className="text-sm text-on-surface">{settings.brandName || '—'}</p>
+                  </div>
+                  <Icon name="edit" size={18} className="text-on-surface-variant" />
+                </button>
+              )}
+            </div>
+          </MD3Card>
+        </section>
+
         {/* Capture Mode */}
         <section className="space-y-2">
           <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Capture Mode</p>
@@ -41,8 +124,10 @@ export function SettingsPage() {
           </MD3Card>
         </section>
 
-        {/* MRP Toggle */}
-        <section>
+        {/* Toggles */}
+        <section className="space-y-3">
+          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Preferences</p>
+
           <MD3Card variant="outlined">
             <div className="flex items-center justify-between">
               <div>
@@ -55,10 +140,7 @@ export function SettingsPage() {
               />
             </div>
           </MD3Card>
-        </section>
 
-        {/* Qty Toggle */}
-        <section>
           <MD3Card variant="outlined">
             <div className="flex items-center justify-between">
               <div>
@@ -68,6 +150,19 @@ export function SettingsPage() {
               <MD3Switch
                 checked={settings.askQty}
                 onChange={(v) => updateSettings({ askQty: v })}
+              />
+            </div>
+          </MD3Card>
+
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-on-surface">Haptic Feedback</p>
+                <p className="text-xs text-on-surface-variant">Vibrate on scan &amp; capture</p>
+              </div>
+              <MD3Switch
+                checked={settings.hapticFeedback}
+                onChange={(v) => updateSettings({ hapticFeedback: v })}
               />
             </div>
           </MD3Card>

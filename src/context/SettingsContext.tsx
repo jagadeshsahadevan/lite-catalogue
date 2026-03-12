@@ -17,7 +17,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     db.settings.toArray().then((rows) => {
       if (rows.length > 0) {
-        setSettings(rows[0]);
+        const stored = rows[0];
+        const merged = { ...DEFAULT_SETTINGS, ...stored };
+        if (merged.setupComplete && merged.onboardingComplete === undefined) {
+          merged.onboardingComplete = true;
+        }
+        setSettings(merged);
       }
       setLoading(false);
     });

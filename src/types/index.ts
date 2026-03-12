@@ -17,6 +17,10 @@ export interface AppSettings {
   apiEndpoint: string;
   customTags: string[];
   setupComplete: boolean;
+  onboardingComplete: boolean;
+  brandName: string;
+  phoneNumber: string;
+  hapticFeedback: boolean;
   lastCsvDownloadDate?: string | null;
 }
 
@@ -54,6 +58,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   apiEndpoint: '',
   customTags: [],
   setupComplete: false,
+  onboardingComplete: false,
+  brandName: '',
+  phoneNumber: '',
+  hapticFeedback: true,
   lastCsvDownloadDate: null,
 };
 

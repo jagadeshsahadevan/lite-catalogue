@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useCamera } from '../hooks/useCamera';
+import { useSettings } from '../context/SettingsContext';
 import { MD3Button } from './md3/MD3Button';
 import { Icon } from './md3/Icon';
 
@@ -12,6 +13,7 @@ interface Props {
 
 export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
   const { videoRef, isActive, error, start, stop, capture, switchCamera, retry } = useCamera();
+  const { settings } = useSettings();
 
   useEffect(() => {
     start();
@@ -21,7 +23,7 @@ export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
   const handleCapture = async () => {
     const blob = await capture();
     if (blob) {
-      if (navigator.vibrate) navigator.vibrate(50);
+      if (settings.hapticFeedback && navigator.vibrate) navigator.vibrate(50);
       onCapture(blob);
     }
   };

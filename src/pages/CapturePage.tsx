@@ -334,14 +334,14 @@ export function CapturePage() {
   const handleScan = useCallback(async (raw: string) => {
     const barcode = sanitizeBarcode(raw);
     if (!barcode) return;
-    if (navigator.vibrate) navigator.vibrate(100);
+    if (settings.hapticFeedback && navigator.vibrate) navigator.vibrate(100);
     const duplicates = await getDuplicateInfo(barcode);
     if (duplicates.length > 0) {
       dispatch({ type: 'DUPLICATE_FOUND', barcode, duplicates });
     } else {
       dispatch({ type: 'SCAN', barcode });
     }
-  }, [getDuplicateInfo]);
+  }, [getDuplicateInfo, settings.hapticFeedback]);
 
   const handleCapture = useCallback(
     (blob: Blob) => {

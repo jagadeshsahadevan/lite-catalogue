@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { Layout } from './components/Layout';
+import { OnboardingPage } from './pages/OnboardingPage';
 import { SetupPage } from './pages/SetupPage';
 import { CapturePage } from './pages/CapturePage';
 import { ProductListPage } from './pages/ProductListPage';
@@ -18,6 +19,15 @@ function AppRoutes() {
           <p className="text-sm text-on-surface-variant">Loading...</p>
         </div>
       </div>
+    );
+  }
+
+  if (!settings.onboardingComplete) {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="*" element={<Navigate to="/onboarding" replace />} />
+      </Routes>
     );
   }
 
