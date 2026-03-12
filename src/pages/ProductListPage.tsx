@@ -4,7 +4,7 @@ import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/ProductCard';
 import { ProductListRow } from '../components/ProductListRow';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
-import { shareProducts, downloadProducts, type ShareMode } from '../utils/shareUtils';
+import { shareProducts } from '../utils/shareUtils';
 import { MD3Chip } from '../components/md3/MD3Chip';
 import { MD3Button } from '../components/md3/MD3Button';
 import { MD3TextField } from '../components/md3/MD3TextField';
@@ -37,7 +37,6 @@ export function ProductListPage() {
   const [activeDateFilter, setActiveDateFilter] = useState<DateFilter | undefined>();
 
   const [sharing, setSharing] = useState(false);
-  const [showSharePicker, setShowSharePicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const selectMode = selected.size > 0;
@@ -314,11 +313,9 @@ export function ProductListPage() {
               disabled={sharing}
               onClick={async () => {
                 setSharing(true);
-                const result = await shareProducts(selectedIds, 'csv', 'both');
+                const result = await shareProducts(selectedIds, 'csv');
                 setSharing(false);
-                if (result.needsFallback) {
-                  setShowSharePicker(true);
-                } else if (result.success) {
+                if (result.success) {
                   setSelected(new Set());
                 }
               }}
@@ -355,51 +352,6 @@ export function ProductListPage() {
         </div>
       )}
 
-      {/* Share picker dialog (shown when native share can't handle zip+csv) */}
-      {showSharePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSharePicker(false)}>
-          <div
-            className="bg-surface rounded-[var(--md-shape-lg)] p-6 mx-6 max-w-sm w-full shadow-xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <Icon name="share" size={24} className="text-primary flex-shrink-0" />
-              <h3 className="text-lg font-medium text-on-surface">Share As</h3>
-            </div>
-            <p className="text-xs text-on-surface-variant">
-              Your device doesn't support sharing these files directly. Choose what to download:
-            </p>
-            <div className="space-y-2">
-              {([
-                { mode: 'both' as ShareMode, icon: 'description', label: 'Images + CSV', desc: 'Zip of photos and catalogue file' },
-                { mode: 'images' as ShareMode, icon: 'photo_camera', label: 'Images Only', desc: 'Zip of product photos' },
-                { mode: 'csv' as ShareMode, icon: 'table', label: 'CSV Only', desc: 'Catalogue spreadsheet' },
-              ]).map((opt) => (
-                <button
-                  key={opt.mode}
-                  disabled={sharing}
-                  onClick={async () => {
-                    setSharing(true);
-                    await downloadProducts(selectedIds, 'csv', opt.mode);
-                    setSharing(false);
-                    setShowSharePicker(false);
-                    setSelected(new Set());
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-[var(--md-shape-sm)] border border-outline-variant text-left active:bg-surface-container-high disabled:opacity-50"
-                >
-                  <Icon name={opt.icon} size={22} className="text-primary flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-on-surface">{opt.label}</p>
-                    <p className="text-xs text-on-surface-variant">{opt.desc}</p>
-                  </div>
-                  <Icon name="download" size={18} className="text-on-surface-variant flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-            <MD3Button variant="text" fullWidth onClick={() => setShowSharePicker(false)}>Cancel</MD3Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

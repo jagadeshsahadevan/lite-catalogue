@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useOcr } from '../hooks/useOcr';
 import { MD3Button } from './md3/MD3Button';
 import { Icon } from './md3/Icon';
@@ -85,19 +85,21 @@ interface Props {
   askCategory: boolean;
   autoMrpDetect: boolean;
   imageBlob: Blob | null;
+  imageCount: number;
   brandOptions: string[];
   categoryOptions: string[];
   lastBrand: string;
   lastCategory: string;
   onSubmit: (data: { mrp: string | null; qty: number | null; brand: string | null; category: string | null }) => void;
+  onAddMorePhotos?: () => void;
 }
 
 export function ProductDetailsInput({
   askMrp, askQty, askBrand, askCategory,
-  autoMrpDetect, imageBlob,
+  autoMrpDetect, imageBlob, imageCount,
   brandOptions, categoryOptions,
   lastBrand, lastCategory,
-  onSubmit,
+  onSubmit, onAddMorePhotos,
 }: Props) {
   const { extractMrp, isProcessing } = useOcr();
   const [mrp, setMrp] = useState('');
@@ -132,7 +134,19 @@ export function ProductDetailsInput({
 
   return (
     <div className="w-full max-w-sm mx-auto">
-      <h3 className="text-lg font-semibold text-on-surface mb-4">Product Details</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-on-surface">Product Details</h3>
+        {onAddMorePhotos && (
+          <button
+            type="button"
+            onClick={onAddMorePhotos}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium active:bg-primary-container/30"
+          >
+            <Icon name="camera" size={14} />
+            Add Photos ({imageCount})
+          </button>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {askMrp && (

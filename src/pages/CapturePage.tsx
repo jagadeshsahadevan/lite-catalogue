@@ -43,6 +43,7 @@ type Action =
   | { type: 'SELECT_TAG'; tag: string }
   | { type: 'SET_DETAILS'; mrp: string | null; qty: number | null; brand: string | null; category: string | null }
   | { type: 'DONE_ADDING'; hasDetails: boolean }
+  | { type: 'BACK_TO_PHOTOS' }
   | { type: 'DELETE_IMAGE'; index: number }
   | { type: 'RESET' };
 
@@ -141,6 +142,9 @@ function reducer(state: State, action: Action): State {
       const isReshoot = !!state.mergeTargetId;
       return { ...state, step: nextStepAfterPhotos(action.hasDetails, isReshoot) };
     }
+
+    case 'BACK_TO_PHOTOS':
+      return { ...state, step: 'photographing' };
 
     case 'DELETE_IMAGE': {
       const newImages = state.images.filter((_, i) => i !== action.index);
@@ -373,6 +377,10 @@ export function CapturePage() {
     dispatch({ type: 'SET_DETAILS', ...data });
   }, []);
 
+  const handleBackToPhotos = useCallback(() => {
+    dispatch({ type: 'BACK_TO_PHOTOS' });
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (state.replaceMode && state.mergeTargetId) {
       await replaceAllImages(state.mergeTargetId, state.images);
@@ -527,7 +535,7 @@ export function CapturePage() {
               label={getPhotoLabel()}
               bottomSlot={tagIndicator}
               onDone={
-                (captureMode === 'front-back' || captureMode === 'front-back-more') && state.images.length > 0
+                state.images.length > 0
                   ? handleDoneAdding
                   : null
               }
@@ -545,11 +553,13 @@ export function CapturePage() {
               askCategory={askCategory}
               autoMrpDetect={settings.autoMrpDetection}
               imageBlob={state.images.length > 0 ? state.images[0].blob : null}
+              imageCount={state.images.length}
               brandOptions={brandOptions}
               categoryOptions={categoryOptions}
               lastBrand={lastBrand}
               lastCategory={lastCategory}
               onSubmit={handleDetails}
+              onAddMorePhotos={handleBackToPhotos}
             />
           </div>
         )}

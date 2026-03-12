@@ -2,15 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/lite-catalogue/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#1e40af" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Lite Catalogue</title>
-    <script type="module" crossorigin src="/assets/index-CmvZh8zq.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B7m7Fc1C.css">
-  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+    <script>
+      // GitHub Pages SPA support: restore route from query string redirect
+      (function(l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      }(window.location))
+    </script>
+    <script type="module" crossorigin src="/lite-catalogue/assets/index-Csywcp1l.js"></script>
+    <link rel="stylesheet" crossorigin href="/lite-catalogue/assets/index-Bmsa8lCV.css">
+  <link rel="manifest" href="/lite-catalogue/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/lite-catalogue/registerSW.js"></script></head>
   <body>
     <div id="root"></div>
   </body>
