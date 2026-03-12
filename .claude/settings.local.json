@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm create:*)",
+      "Bash(export PATH=\"/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/*/bin:$PATH\")",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)",
+      "Bash(bash)",
+      "Bash(curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh)",
+      "Bash(export PATH=\"$HOME/.nvm/versions/node/v24.14.0/bin:$PATH\")",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
