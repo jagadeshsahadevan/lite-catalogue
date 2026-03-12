@@ -21,6 +21,9 @@ interface UseBarcodeScanner {
   stop: () => Promise<void>;
   isScanning: boolean;
   error: string | null;
+  torchOn: boolean;
+  torchSupported: boolean;
+  toggleTorch: () => Promise<void>;
 }
 
 function parsePermissionError(err: unknown): string {
@@ -39,8 +42,11 @@ function parsePermissionError(err: unknown): string {
 
 export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcodeScanner {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
@@ -55,7 +61,10 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
         // Ignore stop errors
       }
       scannerRef.current = null;
+      trackRef.current = null;
       setIsScanning(false);
+      setTorchOn(false);
+      setTorchSupported(false);
     }
   }, []);
 
@@ -81,11 +90,23 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
           (decodedText) => {
             onScanRef.current(decodedText);
           },
-          () => {
-            // Scan failure per frame - ignore
-          },
+          () => {},
         );
         setIsScanning(true);
+
+        // Detect torch support from the scanner's video track
+        try {
+          const videoEl = document.querySelector(`#${elementId} video`) as HTMLVideoElement | null;
+          const stream = videoEl?.srcObject as MediaStream | null;
+          const track = stream?.getVideoTracks()[0] ?? null;
+          trackRef.current = track;
+          if (track) {
+            const caps = track.getCapabilities?.() as Record<string, unknown> | undefined;
+            setTorchSupported(!!caps?.torch);
+          }
+        } catch {
+          setTorchSupported(false);
+        }
       } catch (err) {
         setError(parsePermissionError(err));
         setIsScanning(false);
@@ -94,5 +115,17 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
     [stop],
   );
 
-  return { start, stop, isScanning, error };
+  const toggleTorch = useCallback(async () => {
+    const track = trackRef.current;
+    if (!track) return;
+    try {
+      const next = !torchOn;
+      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      setTorchOn(next);
+    } catch {
+      // torch not available on this track
+    }
+  }, [torchOn]);
+
+  return { start, stop, isScanning, error, torchOn, torchSupported, toggleTorch };
 }

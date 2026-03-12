@@ -10,7 +10,7 @@ interface Props {
 
 export function BarcodeScanner({ onScan }: Props) {
   const [manual, setManual] = useState(false);
-  const { start, stop, isScanning, error } = useBarcodeScanner(onScan);
+  const { start, stop, isScanning, error, torchOn, torchSupported, toggleTorch } = useBarcodeScanner(onScan);
   const mountedRef = useRef(false);
 
   useEffect(() => {
@@ -60,6 +60,16 @@ export function BarcodeScanner({ onScan }: Props) {
           className="w-full rounded-[var(--md-shape-md)] overflow-hidden bg-black barcode-guide"
           style={{ minHeight: 250 }}
         />
+        {isScanning && torchSupported && (
+          <button
+            onClick={toggleTorch}
+            className={`absolute top-2 right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-md ${
+              torchOn ? 'bg-yellow-400 text-black' : 'bg-black/50 text-white'
+            }`}
+          >
+            <Icon name={torchOn ? 'flash-on' : 'flash-off'} size={20} />
+          </button>
+        )}
         {isScanning && (
           <p className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-white/70 pointer-events-none drop-shadow">
             Align barcode within the box
