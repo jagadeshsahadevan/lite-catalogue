@@ -132,7 +132,7 @@ export function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-on-surface">Ask for MRP</p>
-                <p className="text-xs text-on-surface-variant">OCR extraction from images</p>
+                <p className="text-xs text-on-surface-variant">Prompt for price after capture</p>
               </div>
               <MD3Switch
                 checked={settings.askMrp}
@@ -140,6 +140,21 @@ export function SettingsPage() {
               />
             </div>
           </MD3Card>
+
+          {settings.askMrp && (
+            <MD3Card variant="outlined">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Auto MRP Detection</p>
+                  <p className="text-xs text-on-surface-variant">OCR extract price from image</p>
+                </div>
+                <MD3Switch
+                  checked={settings.autoMrpDetection}
+                  onChange={(v) => updateSettings({ autoMrpDetection: v })}
+                />
+              </div>
+            </MD3Card>
+          )}
 
           <MD3Card variant="outlined">
             <div className="flex items-center justify-between">

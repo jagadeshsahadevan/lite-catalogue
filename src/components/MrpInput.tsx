@@ -5,14 +5,16 @@ import { MD3Button } from './md3/MD3Button';
 interface Props {
   imageBlob: Blob;
   onSubmit: (mrp: string | null) => void;
+  autoDetect?: boolean;
 }
 
-export function MrpInput({ imageBlob, onSubmit }: Props) {
+export function MrpInput({ imageBlob, onSubmit, autoDetect = false }: Props) {
   const { extractMrp, isProcessing } = useOcr();
   const [value, setValue] = useState('');
-  const [ocrDone, setOcrDone] = useState(false);
+  const [ocrDone, setOcrDone] = useState(!autoDetect);
 
   useEffect(() => {
+    if (!autoDetect) return;
     let cancelled = false;
 
     (async () => {
@@ -25,7 +27,7 @@ export function MrpInput({ imageBlob, onSubmit }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [imageBlob, extractMrp]);
+  }, [imageBlob, extractMrp, autoDetect]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

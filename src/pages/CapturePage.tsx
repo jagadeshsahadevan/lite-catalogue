@@ -532,7 +532,7 @@ export function CapturePage() {
 
         {state.step === 'mrp_input' && state.images.length > 0 && (
           <div className="pt-4 overflow-y-auto">
-            <MrpInput imageBlob={state.images[0].blob} onSubmit={handleMrp} />
+            <MrpInput imageBlob={state.images[0].blob} onSubmit={handleMrp} autoDetect={settings.autoMrpDetection} />
           </div>
         )}
 

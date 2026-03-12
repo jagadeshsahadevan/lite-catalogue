@@ -21,6 +21,7 @@ export interface AppSettings {
   brandName: string;
   phoneNumber: string;
   hapticFeedback: boolean;
+  autoMrpDetection: boolean;
   lastCsvDownloadDate?: string | null;
 }
 
@@ -62,6 +63,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   brandName: '',
   phoneNumber: '',
   hapticFeedback: true,
+  autoMrpDetection: false,
   lastCsvDownloadDate: null,
 };
 
