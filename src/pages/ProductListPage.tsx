@@ -52,8 +52,9 @@ export function ProductListPage() {
 
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return products;
-    const q = searchQuery.trim().toLowerCase();
-    return products.filter((p) => p.barcode.toLowerCase().includes(q));
+    const q = searchQuery.trim().toUpperCase();
+    if (!q) return products;
+    return products.filter((p) => p.barcode.toUpperCase().includes(q));
   }, [products, searchQuery]);
 
   const toggleSelect = (id: number) => {

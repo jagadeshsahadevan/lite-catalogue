@@ -14,6 +14,7 @@ import { MD3Card } from '../components/md3/MD3Card';
 import { MD3Chip } from '../components/md3/MD3Chip';
 import { Icon } from '../components/md3/Icon';
 import { blobToObjectUrl, revokeObjectUrl } from '../utils/imageUtils';
+import { sanitizeBarcode } from '../utils/constants';
 import { PRESET_TAGS } from '../types';
 import type { CapturedImage, CaptureMode, DuplicateInfo } from '../types';
 
@@ -330,7 +331,9 @@ export function CapturePage() {
   const { captureMode, askMrp, askQty } = settings;
   const allTags = [...PRESET_TAGS, ...settings.customTags];
 
-  const handleScan = useCallback(async (barcode: string) => {
+  const handleScan = useCallback(async (raw: string) => {
+    const barcode = sanitizeBarcode(raw);
+    if (!barcode) return;
     if (navigator.vibrate) navigator.vibrate(100);
     const duplicates = await getDuplicateInfo(barcode);
     if (duplicates.length > 0) {
