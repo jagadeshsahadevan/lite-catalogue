@@ -144,28 +144,28 @@ export function ProductListPage() {
                 {filteredProducts.length}
               </span>
             </div>
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => { setShowSearch(!showSearch); if (showSearch) setSearchQuery(''); }}
-                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
-                  showSearch ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant'
+                className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+                  showSearch ? 'bg-primary-container text-on-primary-container' : 'text-on-surface'
                 }`}
               >
-                <Icon name="search" size={20} />
+                <Icon name="search" size={22} />
               </button>
               <button
                 onClick={() => { setShowDateFilter(!showDateFilter); if (!showDateFilter) setShowSearch(false); }}
-                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
-                  activeDateFilter || showDateFilter ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant'
+                className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+                  activeDateFilter || showDateFilter ? 'bg-primary-container text-on-primary-container' : 'text-on-surface'
                 }`}
               >
-                <Icon name="filter_list" size={20} />
+                <Icon name="filter_list" size={22} />
               </button>
               <button
                 onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface"
               >
-                <Icon name={viewMode === 'grid' ? 'view_list' : 'grid_view'} size={20} />
+                <Icon name={viewMode === 'grid' ? 'view_list' : 'grid_view'} size={22} />
               </button>
             </div>
           </>
