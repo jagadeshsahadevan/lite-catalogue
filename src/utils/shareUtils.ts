@@ -141,6 +141,14 @@ export function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export type ShareMode = 'both' | 'images' | 'csv';
+
+export interface ShareResult {
+  success: boolean;
+  error?: string;
+  needsFallback?: boolean;
+}
+
 function getDateStr(): string {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -161,68 +169,86 @@ function downloadBlob(blob: Blob, filename: string) {
   }, 100);
 }
 
-async function tryNativeShare(files: File[], title: string): Promise<boolean> {
-  if (typeof navigator.share !== 'function') return false;
-  if (typeof navigator.canShare !== 'function') return false;
+async function tryNativeShare(files: File[], title: string): Promise<'shared' | 'unsupported' | 'cancelled'> {
+  if (typeof navigator.share !== 'function') return 'unsupported';
+  if (typeof navigator.canShare !== 'function') return 'unsupported';
 
   try {
-    if (!navigator.canShare({ files })) return false;
+    if (!navigator.canShare({ files })) return 'unsupported';
     await navigator.share({ files, title });
-    return true;
+    return 'shared';
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw err;
-    }
-    return false;
+    if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
+    return 'unsupported';
   }
 }
 
 /**
- * Share product data. Prefers native share sheet, falls back to download.
- * Strategy: share only the CSV log first (widely supported), then attempt
- * to share the zip separately if native share is available.
+ * Share products. Default mode is 'both' (zip + CSV).
+ * Returns { needsFallback: true } when native share can't handle the files,
+ * so the UI can show a picker dialog.
  */
 export async function shareProducts(
   productIds: number[],
   format: ExportFormat,
-  _target: 'email' | 'gdrive' = 'email',
-): Promise<{ success: boolean; error?: string }> {
+  mode: ShareMode = 'both',
+): Promise<ShareResult> {
   try {
     const dateStr = getDateStr();
 
+    if (mode === 'both' || mode === 'images') {
+      const zipBlob = await buildProductImageZip(productIds);
+      const logBlob = mode === 'both' ? await buildLogFile(productIds, format) : null;
+
+      const zipFile = new File([zipBlob], `products-${dateStr}.zip`, { type: 'application/zip' });
+      const logFile = logBlob
+        ? new File([logBlob], `catalogue-${dateStr}.${format}`, { type: MIME_MAP[format] })
+        : null;
+
+      const filesToShare = logFile ? [logFile, zipFile] : [zipFile];
+      const result = await tryNativeShare(filesToShare, `Product Catalogue - ${dateStr}`);
+
+      if (result === 'shared') return { success: true };
+      if (result === 'cancelled') return { success: false, error: 'Share cancelled' };
+
+      // If sharing both failed, try just the zip
+      if (logFile) {
+        const zipOnly = await tryNativeShare([zipFile], `Product Images - ${dateStr}`);
+        if (zipOnly === 'shared') return { success: true };
+        if (zipOnly === 'cancelled') return { success: false, error: 'Share cancelled' };
+      }
+
+      // Native share unsupported for these files
+      if (mode === 'both') {
+        return { success: false, needsFallback: true };
+      }
+
+      // mode === 'images', download directly
+      downloadBlob(zipBlob, `products-${dateStr}.zip`);
+      return { success: true };
+    }
+
+    // mode === 'csv'
     const logBlob = await buildLogFile(productIds, format);
-    const logFile = new File(
-      [logBlob],
-      `catalogue-${dateStr}.${format}`,
-      { type: MIME_MAP[format] },
-    );
+    const logFile = new File([logBlob], `catalogue-${dateStr}.${format}`, { type: MIME_MAP[format] });
 
-    // Attempt native share with just the log file first (most compatible)
-    const shared = await tryNativeShare(
-      [logFile],
-      `Product Catalogue - ${dateStr}`,
-    );
+    const result = await tryNativeShare([logFile], `Product Catalogue - ${dateStr}`);
+    if (result === 'shared') return { success: true };
+    if (result === 'cancelled') return { success: false, error: 'Share cancelled' };
 
-    if (shared) return { success: true };
-
-    // Native share unavailable — try text-only share (works on iOS standalone)
+    // Try text-only share (iOS standalone)
     if (typeof navigator.share === 'function') {
       try {
         const text = await logBlob.text();
-        await navigator.share({
-          title: `Product Catalogue - ${dateStr}`,
-          text,
-        });
+        await navigator.share({ title: `Product Catalogue - ${dateStr}`, text });
         return { success: true };
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           return { success: false, error: 'Share cancelled' };
         }
-        // Fall through to download
       }
     }
 
-    // Final fallback: download
     downloadBlob(logBlob, `catalogue-${dateStr}.${format}`);
     return { success: true };
   } catch (err) {
@@ -234,44 +260,22 @@ export async function shareProducts(
 }
 
 /**
- * Share with images (zip). Tries native share, falls back to download.
+ * Download files directly (fallback when native share is unsupported).
  */
-export async function shareProductsWithImages(
+export async function downloadProducts(
   productIds: number[],
   format: ExportFormat,
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const dateStr = getDateStr();
-    const [zipBlob, logBlob] = await Promise.all([
-      buildProductImageZip(productIds),
-      buildLogFile(productIds, format),
-    ]);
+  mode: ShareMode,
+): Promise<void> {
+  const dateStr = getDateStr();
 
-    const zipFile = new File([zipBlob], `products-${dateStr}.zip`, { type: 'application/zip' });
-    const logFile = new File([logBlob], `catalogue-${dateStr}.${format}`, { type: MIME_MAP[format] });
-
-    // Try sharing both files
-    const sharedBoth = await tryNativeShare(
-      [logFile, zipFile],
-      `Product Catalogue - ${dateStr}`,
-    );
-    if (sharedBoth) return { success: true };
-
-    // Try sharing just the zip
-    const sharedZip = await tryNativeShare(
-      [zipFile],
-      `Product Images - ${dateStr}`,
-    );
-    if (sharedZip) return { success: true };
-
-    // Fallback: download both
+  if (mode === 'both' || mode === 'images') {
+    const zipBlob = await buildProductImageZip(productIds);
     downloadBlob(zipBlob, `products-${dateStr}.zip`);
+  }
+
+  if (mode === 'both' || mode === 'csv') {
+    const logBlob = await buildLogFile(productIds, format);
     downloadBlob(logBlob, `catalogue-${dateStr}.${format}`);
-    return { success: true };
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return { success: false, error: 'Share cancelled' };
-    }
-    return { success: false, error: err instanceof Error ? err.message : 'Share failed' };
   }
 }
