@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/ProductCard';
@@ -25,6 +25,10 @@ export function ProductListPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
   // Date filter state
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateFilterOp, setDateFilterOp] = useState<DateFilterOp>('equal');
@@ -46,6 +50,12 @@ export function ProductListPage() {
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
 
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return products;
+    const q = searchQuery.trim().toLowerCase();
+    return products.filter((p) => p.barcode.toLowerCase().includes(q));
+  }, [products, searchQuery]);
+
   const toggleSelect = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -56,7 +66,7 @@ export function ProductListPage() {
   };
 
   const handleSelectAll = () => {
-    const allIds = new Set(products.filter((p) => p.id !== undefined).map((p) => p.id!));
+    const allIds = new Set(filteredProducts.filter((p) => p.id !== undefined).map((p) => p.id!));
     setSelected(allIds);
   };
 
@@ -105,7 +115,7 @@ export function ProductListPage() {
   return (
     <div className="p-4 max-w-lg mx-auto pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         {selectMode ? (
           <>
             <div className="flex items-center gap-2">
@@ -115,18 +125,12 @@ export function ProductListPage() {
               <span className="text-lg font-medium text-on-surface">{selected.size} selected</span>
             </div>
             <div className="flex items-center gap-1">
-              {selected.size < products.length ? (
-                <button
-                  onClick={handleSelectAll}
-                  className="text-xs text-primary font-medium px-2 py-1"
-                >
+              {selected.size < filteredProducts.length ? (
+                <button onClick={handleSelectAll} className="text-xs text-primary font-medium px-2 py-1">
                   Select All
                 </button>
               ) : (
-                <button
-                  onClick={handleDeselectAll}
-                  className="text-xs text-primary font-medium px-2 py-1"
-                >
+                <button onClick={handleDeselectAll} className="text-xs text-primary font-medium px-2 py-1">
                   Deselect All
                 </button>
               )}
@@ -134,13 +138,25 @@ export function ProductListPage() {
           </>
         ) : (
           <>
-            <h1 className="text-xl font-medium text-on-surface">Products</h1>
-            <div className="flex items-center gap-1">
-              <span className="text-sm text-on-surface-variant mr-2">{products.length}</span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-medium text-on-surface">Products</h1>
+              <span className="text-xs bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full font-medium">
+                {filteredProducts.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-0.5">
               <button
-                onClick={() => setShowDateFilter(!showDateFilter)}
+                onClick={() => { setShowSearch(!showSearch); if (showSearch) setSearchQuery(''); }}
                 className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
-                  activeDateFilter ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant'
+                  showSearch ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant'
+                }`}
+              >
+                <Icon name="search" size={20} />
+              </button>
+              <button
+                onClick={() => { setShowDateFilter(!showDateFilter); if (!showDateFilter) setShowSearch(false); }}
+                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
+                  activeDateFilter || showDateFilter ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant'
                 }`}
               >
                 <Icon name="filter_list" size={20} />
@@ -156,10 +172,35 @@ export function ProductListPage() {
         )}
       </div>
 
+      {/* Search bar */}
+      {showSearch && !selectMode && (
+        <div className="mb-3 relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
+            <Icon name="search" size={18} />
+          </span>
+          <input
+            type="text"
+            inputMode="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by barcode..."
+            autoFocus
+            className="w-full pl-10 pr-10 py-2.5 bg-surface-container rounded-full text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
+            >
+              <Icon name="close" size={18} />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Date filter panel */}
       {showDateFilter && !selectMode && (
-        <div className="mb-4 bg-surface-container rounded-[var(--md-shape-md)] p-3 space-y-3">
-          {/* Date filter mode chips */}
+        <div className="mb-3 bg-surface-container rounded-[var(--md-shape-md)] p-3 space-y-3">
           <div className="flex gap-2">
             {DATE_FILTER_MODES.map((m) => (
               <MD3Chip
@@ -171,7 +212,6 @@ export function ProductListPage() {
             ))}
           </div>
 
-          {/* Date inputs */}
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <MD3TextField
@@ -196,14 +236,9 @@ export function ProductListPage() {
             </MD3Button>
           </div>
 
-          {/* Active filter badge */}
           {activeDateFilter && (
             <div className="flex items-center gap-2">
-              <MD3Chip
-                label="Clear filter"
-                selected={false}
-                onClick={handleClearDateFilter}
-              />
+              <MD3Chip label="Clear filter" selected={false} onClick={handleClearDateFilter} />
               <span className="text-xs text-on-surface-variant">
                 {activeDateFilter.op === 'equal' && `On ${activeDateFilter.date}`}
                 {activeDateFilter.op === 'gte' && `After ${activeDateFilter.date}`}
@@ -228,9 +263,16 @@ export function ProductListPage() {
             Start capturing
           </button>
         </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="text-center py-12 space-y-2">
+          <p className="text-on-surface-variant text-sm">No products match "{searchQuery}"</p>
+          <button onClick={() => setSearchQuery('')} className="text-primary font-medium text-sm">
+            Clear search
+          </button>
+        </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 gap-3">
-          {products.map((p) => (
+          {filteredProducts.map((p) => (
             <ProductCard
               key={p.id}
               product={p}
@@ -242,7 +284,7 @@ export function ProductListPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {products.map((p) => (
+          {filteredProducts.map((p) => (
             <ProductListRow
               key={p.id}
               product={p}
