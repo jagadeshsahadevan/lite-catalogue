@@ -46,7 +46,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/lite-catalogue">
       <SettingsProvider>
         <AppRoutes />
       </SettingsProvider>
