@@ -4,7 +4,7 @@ import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/ProductCard';
 import { ProductListRow } from '../components/ProductListRow';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
-import { ShareDialog } from '../components/ShareDialog';
+import { shareProducts } from '../utils/shareUtils';
 import { MD3Chip } from '../components/md3/MD3Chip';
 import { MD3Button } from '../components/md3/MD3Button';
 import { MD3TextField } from '../components/md3/MD3TextField';
@@ -32,8 +32,7 @@ export function ProductListPage() {
   const [dateTo, setDateTo] = useState('');
   const [activeDateFilter, setActiveDateFilter] = useState<DateFilter | undefined>();
 
-  // Share dialog state
-  const [shareTarget, setShareTarget] = useState<'email' | 'gdrive' | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const selectMode = selected.size > 0;
 
@@ -270,36 +269,25 @@ export function ProductListPage() {
               </span>
             </MD3Button>
             <MD3Button
-              variant="tonal"
-              onClick={() => setShareTarget('email')}
+              variant="filled"
+              disabled={sharing}
+              onClick={async () => {
+                setSharing(true);
+                const result = await shareProducts(selectedIds, 'csv', 'email');
+                setSharing(false);
+                if (result.success) {
+                  setSelected(new Set());
+                }
+              }}
               className="flex-1"
             >
               <span className="flex items-center justify-center gap-1.5">
-                <Icon name="mail" size={16} />
-                Email
-              </span>
-            </MD3Button>
-            <MD3Button
-              variant="tonal"
-              onClick={() => setShareTarget('gdrive')}
-              className="flex-1"
-            >
-              <span className="flex items-center justify-center gap-1.5">
-                <Icon name="cloud_upload" size={16} />
-                Drive
+                <Icon name="share" size={16} />
+                {sharing ? 'Preparing...' : 'Share'}
               </span>
             </MD3Button>
           </div>
         </StickyBottomCTA>
-      )}
-
-      {/* Share dialog */}
-      {shareTarget && (
-        <ShareDialog
-          productIds={selectedIds}
-          target={shareTarget}
-          onClose={() => setShareTarget(null)}
-        />
       )}
     </div>
   );

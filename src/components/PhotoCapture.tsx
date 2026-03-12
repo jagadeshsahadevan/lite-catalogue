@@ -27,15 +27,14 @@ export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center h-[calc(100vh-10rem)]">
       {label && (
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-on-surface">Take Photo</h2>
-          <p className="text-sm text-primary font-medium mt-1">{label}</p>
+        <div className="text-center py-1">
+          <p className="text-sm text-primary font-medium">{label}</p>
         </div>
       )}
 
-      <div className="camera-viewfinder relative w-full max-w-sm aspect-[3/4] bg-black rounded-[var(--md-shape-lg)] overflow-hidden">
+      <div className="camera-viewfinder relative w-full max-w-sm flex-1 min-h-0 bg-black rounded-[var(--md-shape-lg)] overflow-hidden">
         <video
           ref={videoRef as React.RefObject<HTMLVideoElement>}
           playsInline
@@ -50,7 +49,7 @@ export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
       </div>
 
       {error && (
-        <div className="text-on-error-container text-sm bg-error-container p-3 rounded-[var(--md-shape-sm)] w-full max-w-sm">
+        <div className="text-on-error-container text-sm bg-error-container p-3 rounded-[var(--md-shape-sm)] w-full max-w-sm mt-2">
           <p>{error}</p>
           <MD3Button
             variant="outlined"
@@ -63,29 +62,31 @@ export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
         </div>
       )}
 
-      {/* Tag indicator slot — sits just above the capture button */}
-      {bottomSlot}
+      {/* Sticky bottom area: tag indicator + capture button */}
+      <div className="w-full max-w-sm flex-shrink-0 pt-3 pb-1 space-y-2">
+        {bottomSlot}
 
-      <div className="flex items-center gap-6">
-        <button
-          onClick={switchCamera}
-          className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center active:bg-surface-container-high"
-          title="Switch camera"
-        >
-          <Icon name="swap-camera" size={24} className="text-on-surface-variant" />
-        </button>
+        <div className="flex items-center justify-center gap-6">
+          <button
+            onClick={switchCamera}
+            className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center active:bg-surface-container-high"
+            title="Switch camera"
+          >
+            <Icon name="swap-camera" size={24} className="text-on-surface-variant" />
+          </button>
 
-        <button
-          onClick={handleCapture}
-          disabled={!isActive}
-          className="relative w-18 h-18 disabled:opacity-40"
-          title="Capture photo"
-        >
-          <span className="absolute inset-0 rounded-full border-4 border-white bg-white/20 capture-btn-ring" />
-          <span className="absolute inset-1 rounded-full bg-white border-2 border-outline-variant active:bg-surface-dim" />
-        </button>
+          <button
+            onClick={handleCapture}
+            disabled={!isActive}
+            className="relative w-18 h-18 disabled:opacity-40"
+            title="Capture photo"
+          >
+            <span className="absolute inset-0 rounded-full border-4 border-white bg-white/20 capture-btn-ring" />
+            <span className="absolute inset-1 rounded-full bg-white border-2 border-outline-variant active:bg-surface-dim" />
+          </button>
 
-        <div className="w-12 h-12" />
+          <div className="w-12 h-12" />
+        </div>
       </div>
     </div>
   );

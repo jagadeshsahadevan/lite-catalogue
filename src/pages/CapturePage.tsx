@@ -353,26 +353,26 @@ export function CapturePage() {
   );
 
   return (
-    <div className="p-4 flex flex-col items-center min-h-[calc(100vh-5rem)]">
-      {/* Barcode display */}
+    <div className="px-4 pt-2 flex flex-col items-center h-[calc(100vh-5rem)] overflow-hidden">
+      {/* Barcode + thumbnail strip — compact top bar */}
       {state.barcode && state.step !== 'scanning' && state.step !== 'duplicate_prompt' && (
-        <div className="w-full max-w-sm mb-4 flex items-center justify-between bg-surface rounded-[var(--md-shape-sm)] px-3 py-2 border border-outline-variant">
-          <span className="text-xs text-on-surface-variant">Barcode</span>
-          <span className="text-sm font-mono font-medium text-on-surface">{state.barcode}</span>
-        </div>
-      )}
-
-      {/* Captured images strip */}
-      {state.images.length > 0 && state.step !== 'confirming' && (
-        <div className="w-full max-w-sm mb-4 flex gap-2 overflow-x-auto pb-1">
-          {state.images.map((img, i) => (
-            <PhotoPreview key={i} blob={img.blob} tag={img.tag || '?'} size="sm" />
-          ))}
+        <div className="w-full max-w-sm mb-2 flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-surface rounded-[var(--md-shape-sm)] px-3 py-1.5 border border-outline-variant flex-shrink-0">
+            <span className="text-[10px] text-on-surface-variant uppercase">BC</span>
+            <span className="text-sm font-mono font-medium text-on-surface">{state.barcode}</span>
+          </div>
+          {state.images.length > 0 && state.step !== 'confirming' && (
+            <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0">
+              {state.images.map((img, i) => (
+                <PhotoPreview key={i} blob={img.blob} tag={img.tag || '?'} size="sm" />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Step content */}
-      <div className="flex-1 flex items-center justify-center w-full">
+      <div className="flex-1 flex items-center justify-center w-full min-h-0 overflow-auto">
         {state.step === 'scanning' && <BarcodeScanner onScan={handleScan} />}
 
         {state.step === 'duplicate_prompt' && (
