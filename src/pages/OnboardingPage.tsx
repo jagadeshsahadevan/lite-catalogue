@@ -18,11 +18,30 @@ export function OnboardingPage() {
   const [brand, setBrand] = useState('');
 
   const handleContinue = async () => {
+    const mobile = phone.trim();
+    const brandName = brand.trim();
+
     await updateSettings({
-      phoneNumber: phone.trim(),
-      brandName: brand.trim(),
+      phoneNumber: mobile,
+      brandName,
       onboardingComplete: true,
     });
+
+    if (mobile || brandName) {
+      const payload: Record<string, string> = {};
+      if (mobile) payload.mobile = mobile;
+      if (brandName) payload.brand = brandName;
+
+      fetch(
+        'https://asia-south1.api.boltic.io/service/webhook/temporal/v1.0/60be8050-04fe-4c85-965c-f27b2bd5a1f5/workflows/execute/77d4d6ab-9a86-4f11-87b3-528af2476676',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+      ).catch(() => {});
+    }
+
     navigate('/setup');
   };
 
