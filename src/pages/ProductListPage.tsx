@@ -93,10 +93,6 @@ export function ProductListPage() {
     }
   };
 
-  const handleLongPress = (product: Product) => {
-    if (product.id) toggleSelect(product.id);
-  };
-
   const handleApplyDateFilter = () => {
     if (!dateFrom) return;
     setActiveDateFilter({
@@ -279,8 +275,8 @@ export function ProductListPage() {
               key={p.id}
               product={p}
               onClick={() => handleCardAction(p)}
-              onLongPress={() => handleLongPress(p)}
-              selected={selectMode && p.id !== undefined && selected.has(p.id)}
+              onToggleSelect={() => p.id !== undefined && toggleSelect(p.id)}
+              selected={p.id !== undefined && selected.has(p.id)}
             />
           ))}
         </div>
@@ -291,8 +287,8 @@ export function ProductListPage() {
               key={p.id}
               product={p}
               onClick={() => handleCardAction(p)}
-              onLongPress={() => handleLongPress(p)}
-              selected={selectMode && p.id !== undefined && selected.has(p.id)}
+              onToggleSelect={() => p.id !== undefined && toggleSelect(p.id)}
+              selected={p.id !== undefined && selected.has(p.id)}
             />
           ))}
         </div>
