@@ -109,10 +109,16 @@
 
 /* ─── Base Styles ─── */
 html, body, #root {
-  height: 100%;
+  height: 100dvh;
+  height: 100vh; /* fallback for older browsers */
+  height: 100dvh;
   margin: 0;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --nav-h: 4rem; /* 64px bottom nav */
 }
 
 body {

@@ -21,7 +21,7 @@ export function ConfirmationView({ barcode, mrp, qty, images, onNext, onDone }: 
   }, {});
 
   return (
-    <div className="w-full max-w-sm mx-auto space-y-4 pb-40">
+    <div className="w-full max-w-sm mx-auto space-y-4">
       <div className="text-center">
         <div className="w-14 h-14 bg-success-container rounded-full flex items-center justify-center mx-auto mb-2">
           <Icon name="check" size={28} className="text-success" />

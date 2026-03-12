@@ -13,7 +13,7 @@ export function StickyBottomCTA({ children, className = '' }: Props) {
   return (
     <div
       className={`
-        fixed bottom-16 left-0 right-0 z-40
+        fixed left-0 right-0 z-40 bottom-[var(--nav-h)]
         px-4 py-3
         bg-surface/95 backdrop-blur-sm
         border-t border-outline-variant

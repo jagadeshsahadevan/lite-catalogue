@@ -31,7 +31,7 @@ export function SetupPage() {
   };
 
   return (
-    <div className="min-h-full flex flex-col justify-center p-6 bg-surface">
+    <div className="h-full flex flex-col justify-center p-6 bg-surface overflow-y-auto">
       <div className="max-w-sm mx-auto w-full space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-on-surface">Lite Catalogue</h1>

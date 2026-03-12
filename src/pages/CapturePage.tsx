@@ -353,10 +353,10 @@ export function CapturePage() {
   );
 
   return (
-    <div className="px-4 pt-2 flex flex-col items-center h-[calc(100vh-5rem)] overflow-hidden">
+    <div className="px-4 pt-2 pb-2 flex flex-col items-center h-full overflow-hidden">
       {/* Barcode + thumbnail strip — compact top bar */}
       {state.barcode && state.step !== 'scanning' && state.step !== 'duplicate_prompt' && (
-        <div className="w-full max-w-sm mb-2 flex items-center gap-2">
+        <div className="w-full max-w-sm mb-2 flex items-center gap-2 flex-shrink-0">
           <div className="flex items-center gap-2 bg-surface rounded-[var(--md-shape-sm)] px-3 py-1.5 border border-outline-variant flex-shrink-0">
             <span className="text-[10px] text-on-surface-variant uppercase">BC</span>
             <span className="text-sm font-mono font-medium text-on-surface">{state.barcode}</span>
@@ -372,11 +372,15 @@ export function CapturePage() {
       )}
 
       {/* Step content */}
-      <div className="flex-1 flex items-center justify-center w-full min-h-0 overflow-auto">
-        {state.step === 'scanning' && <BarcodeScanner onScan={handleScan} />}
+      <div className="flex-1 flex flex-col w-full min-h-0">
+        {state.step === 'scanning' && (
+          <div className="flex-1 flex items-center justify-center">
+            <BarcodeScanner onScan={handleScan} />
+          </div>
+        )}
 
         {state.step === 'duplicate_prompt' && (
-          <div className="w-full max-w-sm mx-auto space-y-4 pb-40">
+          <div className="w-full max-w-sm mx-auto space-y-4 overflow-y-auto pb-24 pt-2">
             <MD3Card variant="outlined">
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-2 text-on-surface">
@@ -441,7 +445,7 @@ export function CapturePage() {
         )}
 
         {state.step === 'photographing' && (
-          <div className="w-full space-y-4">
+          <div className="w-full flex flex-col flex-1 min-h-0">
             <PhotoCapture
               onCapture={handleCapture}
               label={getPhotoLabel()}
@@ -449,11 +453,11 @@ export function CapturePage() {
             />
 
             {captureMode === 'front-back-more' && state.images.length > 0 && (
-              <div className="max-w-sm mx-auto">
+              <div className="max-w-sm mx-auto w-full flex-shrink-0 pt-1">
                 <MD3Button variant="filled" fullWidth onClick={handleDoneAdding}>
                   <span className="flex items-center justify-center gap-2">
                     <Icon name="check" size={18} />
-                    Done Adding Photos ({state.images.length} taken)
+                    Done ({state.images.length} photos)
                   </span>
                 </MD3Button>
               </div>
@@ -462,22 +466,28 @@ export function CapturePage() {
         )}
 
         {state.step === 'mrp_input' && state.images.length > 0 && (
-          <MrpInput imageBlob={state.images[0].blob} onSubmit={handleMrp} />
+          <div className="pt-4 overflow-y-auto">
+            <MrpInput imageBlob={state.images[0].blob} onSubmit={handleMrp} />
+          </div>
         )}
 
         {state.step === 'qty_input' && (
-          <QtyInput onSubmit={handleQty} />
+          <div className="pt-4 overflow-y-auto">
+            <QtyInput onSubmit={handleQty} />
+          </div>
         )}
 
         {state.step === 'confirming' && (
-          <ConfirmationView
-            barcode={state.barcode}
-            mrp={state.mrp}
-            qty={state.qty}
-            images={state.images}
-            onNext={handleNext}
-            onDone={handleDone}
-          />
+          <div className="overflow-y-auto pb-24 pt-2">
+            <ConfirmationView
+              barcode={state.barcode}
+              mrp={state.mrp}
+              qty={state.qty}
+              images={state.images}
+              onNext={handleNext}
+              onDone={handleDone}
+            />
+          </div>
         )}
       </div>
     </div>

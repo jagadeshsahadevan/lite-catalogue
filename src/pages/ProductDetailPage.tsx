@@ -134,7 +134,7 @@ export function ProductDetailPage() {
           </button>
         }
       />
-      <div className="p-4 max-w-sm mx-auto space-y-4 pb-40">
+      <div className="p-4 max-w-sm mx-auto space-y-4 pb-24">
         {/* Info card */}
         <div className="bg-surface rounded-[var(--md-shape-md)] border border-outline-variant p-4 space-y-3">
           <div className="flex justify-between text-sm">

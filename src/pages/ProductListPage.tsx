@@ -103,7 +103,7 @@ export function ProductListPage() {
   const selectedIds = Array.from(selected);
 
   return (
-    <div className="p-4 max-w-lg mx-auto pb-40">
+    <div className="p-4 max-w-lg mx-auto pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         {selectMode ? (
