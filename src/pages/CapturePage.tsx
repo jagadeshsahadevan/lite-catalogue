@@ -4,9 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useProducts } from '../hooks/useProducts';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { PhotoCapture } from '../components/PhotoCapture';
-import { MrpInput } from '../components/MrpInput';
-import { QtyInput } from '../components/QtyInput';
-import { ComboBoxInput } from '../components/ComboBoxInput';
+import { ProductDetailsInput } from '../components/ProductDetailsInput';
 import { ConfirmationView } from '../components/ConfirmationView';
 import { PhotoPreview } from '../components/PhotoPreview';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
@@ -19,14 +17,7 @@ import { sanitizeBarcode } from '../utils/constants';
 import { PRESET_TAGS } from '../types';
 import type { CapturedImage, CaptureMode, DuplicateInfo } from '../types';
 
-type Step = 'scanning' | 'duplicate_prompt' | 'photographing' | 'mrp_input' | 'qty_input' | 'brand_input' | 'category_input' | 'confirming';
-
-interface StepFlags {
-  askMrp: boolean;
-  askQty: boolean;
-  askBrand: boolean;
-  askCategory: boolean;
-}
+type Step = 'scanning' | 'duplicate_prompt' | 'photographing' | 'details_input' | 'confirming';
 
 interface State {
   step: Step;
@@ -48,13 +39,10 @@ type Action =
   | { type: 'DUPLICATE_FOUND'; barcode: string; duplicates: DuplicateInfo[] }
   | { type: 'RESHOOT_CHOSEN'; productId: number }
   | { type: 'NEW_PRODUCT_CHOSEN' }
-  | { type: 'CAPTURE'; blob: Blob; captureMode: CaptureMode; flags: StepFlags; allTags: string[] }
+  | { type: 'CAPTURE'; blob: Blob; captureMode: CaptureMode; hasDetails: boolean; allTags: string[] }
   | { type: 'SELECT_TAG'; tag: string }
-  | { type: 'SET_MRP'; mrp: string | null; flags: StepFlags }
-  | { type: 'SET_QTY'; qty: number | null; flags: StepFlags }
-  | { type: 'SET_BRAND'; brand: string | null; flags: StepFlags }
-  | { type: 'SET_CATEGORY'; category: string | null }
-  | { type: 'DONE_ADDING'; flags: StepFlags }
+  | { type: 'SET_DETAILS'; mrp: string | null; qty: number | null; brand: string | null; category: string | null }
+  | { type: 'DONE_ADDING'; hasDetails: boolean }
   | { type: 'DELETE_IMAGE'; index: number }
   | { type: 'RESET' };
 
@@ -79,30 +67,9 @@ function getNextTag(currentTag: string, allTags: string[]): string {
   return allTags[idx + 1];
 }
 
-function nextStepAfterPhotos(flags: StepFlags, isReshoot: boolean): Step {
+function nextStepAfterPhotos(hasDetails: boolean, isReshoot: boolean): Step {
   if (isReshoot) return 'confirming';
-  if (flags.askMrp) return 'mrp_input';
-  if (flags.askQty) return 'qty_input';
-  if (flags.askBrand) return 'brand_input';
-  if (flags.askCategory) return 'category_input';
-  return 'confirming';
-}
-
-function nextStepAfterMrp(flags: StepFlags): Step {
-  if (flags.askQty) return 'qty_input';
-  if (flags.askBrand) return 'brand_input';
-  if (flags.askCategory) return 'category_input';
-  return 'confirming';
-}
-
-function nextStepAfterQty(flags: StepFlags): Step {
-  if (flags.askBrand) return 'brand_input';
-  if (flags.askCategory) return 'category_input';
-  return 'confirming';
-}
-
-function nextStepAfterBrand(flags: StepFlags): Step {
-  if (flags.askCategory) return 'category_input';
+  if (hasDetails) return 'details_input';
   return 'confirming';
 }
 
@@ -131,7 +98,7 @@ function reducer(state: State, action: Action): State {
           ...state,
           images: newImages,
           photoIndex: newIndex,
-          step: nextStepAfterPhotos(action.flags, isReshoot),
+          step: nextStepAfterPhotos(action.hasDetails, isReshoot),
           selectedTag: 'Front',
         };
       }
@@ -150,7 +117,7 @@ function reducer(state: State, action: Action): State {
           ...state,
           images: newImages,
           photoIndex: newIndex,
-          step: nextStepAfterPhotos(action.flags, isReshoot),
+          step: nextStepAfterPhotos(action.hasDetails, isReshoot),
         };
       }
 
@@ -167,21 +134,12 @@ function reducer(state: State, action: Action): State {
     case 'SELECT_TAG':
       return { ...state, selectedTag: action.tag };
 
-    case 'SET_MRP':
-      return { ...state, mrp: action.mrp, step: nextStepAfterMrp(action.flags) };
-
-    case 'SET_QTY':
-      return { ...state, qty: action.qty, step: nextStepAfterQty(action.flags) };
-
-    case 'SET_BRAND':
-      return { ...state, brand: action.brand, step: nextStepAfterBrand(action.flags) };
-
-    case 'SET_CATEGORY':
-      return { ...state, category: action.category, step: 'confirming' };
+    case 'SET_DETAILS':
+      return { ...state, mrp: action.mrp, qty: action.qty, brand: action.brand, category: action.category, step: 'confirming' };
 
     case 'DONE_ADDING': {
       const isReshoot = !!state.mergeTargetId;
-      return { ...state, step: isReshoot ? 'confirming' : nextStepAfterPhotos(action.flags, false) };
+      return { ...state, step: nextStepAfterPhotos(action.hasDetails, isReshoot) };
     }
 
     case 'DELETE_IMAGE': {
@@ -381,7 +339,7 @@ export function CapturePage() {
   }, []);
 
   const { captureMode, askMrp, askQty, askBrand, askCategory } = settings;
-  const stepFlags: StepFlags = { askMrp, askQty, askBrand, askCategory };
+  const hasDetails = askMrp || askQty || askBrand || askCategory;
   const allTags = [...PRESET_TAGS, ...settings.customTags];
 
   const handleScan = useCallback(async (raw: string) => {
@@ -398,9 +356,9 @@ export function CapturePage() {
 
   const handleCapture = useCallback(
     (blob: Blob) => {
-      dispatch({ type: 'CAPTURE', blob, captureMode, flags: stepFlags, allTags });
+      dispatch({ type: 'CAPTURE', blob, captureMode, hasDetails, allTags });
     },
-    [captureMode, stepFlags, allTags],
+    [captureMode, hasDetails, allTags],
   );
 
   const handleTagSelect = useCallback((tag: string) => {
@@ -408,23 +366,11 @@ export function CapturePage() {
   }, []);
 
   const handleDoneAdding = useCallback(() => {
-    dispatch({ type: 'DONE_ADDING', flags: stepFlags });
-  }, [stepFlags]);
+    dispatch({ type: 'DONE_ADDING', hasDetails });
+  }, [hasDetails]);
 
-  const handleMrp = useCallback((mrp: string | null) => {
-    dispatch({ type: 'SET_MRP', mrp, flags: stepFlags });
-  }, [stepFlags]);
-
-  const handleQty = useCallback((qty: number | null) => {
-    dispatch({ type: 'SET_QTY', qty, flags: stepFlags });
-  }, [stepFlags]);
-
-  const handleBrand = useCallback((brand: string | null) => {
-    dispatch({ type: 'SET_BRAND', brand, flags: stepFlags });
-  }, [stepFlags]);
-
-  const handleCategory = useCallback((category: string | null) => {
-    dispatch({ type: 'SET_CATEGORY', category });
+  const handleDetails = useCallback((data: { mrp: string | null; qty: number | null; brand: string | null; category: string | null }) => {
+    dispatch({ type: 'SET_DETAILS', ...data });
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -433,7 +379,6 @@ export function CapturePage() {
     } else {
       await createProduct(state.barcode, state.mrp, state.images, state.qty, state.brand, state.category);
     }
-    // Refresh options for next product
     getDistinctBrands().then(setBrandOptions);
     getDistinctCategories().then(setCategoryOptions);
     if (state.brand) setLastBrand(state.brand);
@@ -596,38 +541,20 @@ export function CapturePage() {
           </div>
         )}
 
-        {state.step === 'mrp_input' && state.images.length > 0 && (
+        {state.step === 'details_input' && (
           <div className="pt-4 overflow-y-auto">
-            <MrpInput imageBlob={state.images[0].blob} onSubmit={handleMrp} autoDetect={settings.autoMrpDetection} />
-          </div>
-        )}
-
-        {state.step === 'qty_input' && (
-          <div className="pt-4 overflow-y-auto">
-            <QtyInput onSubmit={handleQty} />
-          </div>
-        )}
-
-        {state.step === 'brand_input' && (
-          <div className="pt-4 overflow-y-auto">
-            <ComboBoxInput
-              label="Product Brand"
-              value={lastBrand}
-              options={brandOptions}
-              onSubmit={handleBrand}
-              placeholder="e.g. Samsung, Nike..."
-            />
-          </div>
-        )}
-
-        {state.step === 'category_input' && (
-          <div className="pt-4 overflow-y-auto">
-            <ComboBoxInput
-              label="Product Category"
-              value={lastCategory}
-              options={categoryOptions}
-              onSubmit={handleCategory}
-              placeholder="e.g. Electronics, Clothing..."
+            <ProductDetailsInput
+              askMrp={askMrp}
+              askQty={askQty}
+              askBrand={askBrand}
+              askCategory={askCategory}
+              autoMrpDetect={settings.autoMrpDetection}
+              imageBlob={state.images.length > 0 ? state.images[0].blob : null}
+              brandOptions={brandOptions}
+              categoryOptions={categoryOptions}
+              lastBrand={lastBrand}
+              lastCategory={lastCategory}
+              onSubmit={handleDetails}
             />
           </div>
         )}
