@@ -173,6 +173,14 @@ export function useProducts() {
     await db.products.update(productId, { qty });
   }, []);
 
+  const updateProductBrand = useCallback(async (productId: number, brand: string | null) => {
+    await db.products.update(productId, { brand });
+  }, []);
+
+  const updateProductCategory = useCallback(async (productId: number, category: string | null) => {
+    await db.products.update(productId, { category });
+  }, []);
+
   const getImageCount = useCallback(async (productId: number): Promise<number> => {
     return db.images.where('productId').equals(productId).count();
   }, []);
@@ -225,6 +233,8 @@ export function useProducts() {
     getDuplicateInfo,
     updateProductMrp,
     updateProductQty,
+    updateProductBrand,
+    updateProductCategory,
     getImageCount,
     getDistinctBrands,
     getDistinctCategories,

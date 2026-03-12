@@ -120,16 +120,24 @@ export function ProductDetailsInput({
     return () => { cancelled = true; };
   }, [autoMrpDetect, askMrp, imageBlob, extractMrp]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const gatherData = () => {
     const trimmedQty = qty.trim();
     const parsedQty = trimmedQty === '' ? null : parseInt(trimmedQty, 10);
-    onSubmit({
+    return {
       mrp: askMrp ? (mrp.trim() || null) : null,
       qty: askQty ? (isNaN(parsedQty as number) ? null : parsedQty) : null,
       brand: askBrand ? (brand.trim() || null) : null,
       category: askCategory ? (category.trim() || null) : null,
-    });
+    };
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(gatherData());
+  };
+
+  const handleSkip = () => {
+    onSubmit({ mrp: null, qty: null, brand: null, category: null });
   };
 
   return (
@@ -210,8 +218,11 @@ export function ProductDetailsInput({
           />
         )}
 
-        <div className="pt-1">
-          <MD3Button type="submit" variant="filled" fullWidth disabled={isProcessing}>
+        <div className="flex gap-3 pt-1">
+          <MD3Button type="button" variant="outlined" onClick={handleSkip} className="flex-1">
+            Skip
+          </MD3Button>
+          <MD3Button type="submit" variant="filled" disabled={isProcessing} className="flex-1">
             Continue
           </MD3Button>
         </div>

@@ -17,10 +17,16 @@ export function SetupPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<CaptureMode>(settings.captureMode);
   const [askMrp, setAskMrp] = useState(settings.askMrp);
+  const [askQty, setAskQty] = useState(settings.askQty);
+  const [askBrand, setAskBrand] = useState(settings.askBrand);
+  const [askCategory, setAskCategory] = useState(settings.askCategory);
   const handleSave = async () => {
     await updateSettings({
       captureMode: mode,
       askMrp,
+      askQty,
+      askBrand,
+      askCategory,
       setupComplete: true,
     });
     navigate('/capture');
@@ -52,16 +58,47 @@ export function SetupPage() {
           </div>
         </div>
 
-        {/* MRP Toggle */}
-        <MD3Card variant="outlined">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-on-surface">Ask for MRP</p>
-              <p className="text-sm text-on-surface-variant">Extract MRP from product images</p>
+        {/* Product fields toggles */}
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-on-surface-variant">Product Fields</p>
+          <p className="text-xs text-on-surface-variant">Choose what to capture per product. You can change these later in Settings.</p>
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-on-surface">MRP</p>
+                <p className="text-sm text-on-surface-variant">Price of the product</p>
+              </div>
+              <MD3Switch checked={askMrp} onChange={setAskMrp} />
             </div>
-            <MD3Switch checked={askMrp} onChange={setAskMrp} />
-          </div>
-        </MD3Card>
+          </MD3Card>
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-on-surface">Quantity</p>
+                <p className="text-sm text-on-surface-variant">Stock count available</p>
+              </div>
+              <MD3Switch checked={askQty} onChange={setAskQty} />
+            </div>
+          </MD3Card>
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-on-surface">Brand</p>
+                <p className="text-sm text-on-surface-variant">Brand name per product</p>
+              </div>
+              <MD3Switch checked={askBrand} onChange={setAskBrand} />
+            </div>
+          </MD3Card>
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-on-surface">Collection</p>
+                <p className="text-sm text-on-surface-variant">Category or collection per product</p>
+              </div>
+              <MD3Switch checked={askCategory} onChange={setAskCategory} />
+            </div>
+          </MD3Card>
+        </div>
 
         <MD3Button variant="filled" fullWidth onClick={handleSave}>
           Get Started

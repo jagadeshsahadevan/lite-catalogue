@@ -14,7 +14,7 @@ import type { Product, ProductImage } from '../types';
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty } = useProducts();
+  const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty, updateProductBrand, updateProductCategory } = useProducts();
   const { settings } = useSettings();
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -28,6 +28,14 @@ export function ProductDetailPage() {
   // Inline Qty editing
   const [editingQty, setEditingQty] = useState(false);
   const [qtyValue, setQtyValue] = useState('');
+
+  // Inline Brand editing
+  const [editingBrand, setEditingBrand] = useState(false);
+  const [brandValue, setBrandValue] = useState('');
+
+  // Inline Category editing
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [categoryValue, setCategoryValue] = useState('');
 
   // Delete confirmation state
   const [showDeleteProduct, setShowDeleteProduct] = useState(false);
@@ -97,6 +105,32 @@ export function ProductDetailPage() {
     await updateProductQty(product.id, isNaN(qty as number) ? null : qty);
     setProduct((prev) => prev ? { ...prev, qty } : prev);
     setEditingQty(false);
+  };
+
+  const handleStartEditBrand = () => {
+    setBrandValue(product?.brand || '');
+    setEditingBrand(true);
+  };
+
+  const handleSaveBrand = async () => {
+    if (!product?.id) return;
+    const brand = brandValue.trim() || null;
+    await updateProductBrand(product.id, brand);
+    setProduct((prev) => prev ? { ...prev, brand } : prev);
+    setEditingBrand(false);
+  };
+
+  const handleStartEditCategory = () => {
+    setCategoryValue(product?.category || '');
+    setEditingCategory(true);
+  };
+
+  const handleSaveCategory = async () => {
+    if (!product?.id) return;
+    const category = categoryValue.trim() || null;
+    await updateProductCategory(product.id, category);
+    setProduct((prev) => prev ? { ...prev, category } : prev);
+    setEditingCategory(false);
   };
 
   const canEditTags = true;
@@ -207,19 +241,67 @@ export function ProductDetailPage() {
             )}
           </div>
 
-          {product.brand && (
-            <div className="flex justify-between text-sm">
-              <span className="text-on-surface-variant">Brand</span>
-              <span className="font-medium text-on-surface">{product.brand}</span>
-            </div>
-          )}
+          {/* Editable Brand */}
+          <div className="flex justify-between text-sm items-center">
+            <span className="text-on-surface-variant">Brand</span>
+            {editingBrand ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={brandValue}
+                  onChange={(e) => setBrandValue(e.target.value)}
+                  className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
+                  autoFocus
+                  placeholder="Brand name"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveBrand()}
+                />
+                <button onClick={handleSaveBrand} className="text-primary">
+                  <Icon name="check" size={18} />
+                </button>
+                <button onClick={() => setEditingBrand(false)} className="text-on-surface-variant">
+                  <Icon name="close" size={18} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleStartEditBrand} className="flex items-center gap-1 group">
+                <span className="font-medium text-on-surface">
+                  {product.brand || '—'}
+                </span>
+                <Icon name="edit" size={14} className="text-on-surface-variant opacity-0 group-hover:opacity-100 group-active:opacity-100" />
+              </button>
+            )}
+          </div>
 
-          {product.category && (
-            <div className="flex justify-between text-sm">
-              <span className="text-on-surface-variant">Category</span>
-              <span className="font-medium text-on-surface">{product.category}</span>
-            </div>
-          )}
+          {/* Editable Category */}
+          <div className="flex justify-between text-sm items-center">
+            <span className="text-on-surface-variant">Category</span>
+            {editingCategory ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={categoryValue}
+                  onChange={(e) => setCategoryValue(e.target.value)}
+                  className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
+                  autoFocus
+                  placeholder="Category"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveCategory()}
+                />
+                <button onClick={handleSaveCategory} className="text-primary">
+                  <Icon name="check" size={18} />
+                </button>
+                <button onClick={() => setEditingCategory(false)} className="text-on-surface-variant">
+                  <Icon name="close" size={18} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleStartEditCategory} className="flex items-center gap-1 group">
+                <span className="font-medium text-on-surface">
+                  {product.category || '—'}
+                </span>
+                <Icon name="edit" size={14} className="text-on-surface-variant opacity-0 group-hover:opacity-100 group-active:opacity-100" />
+              </button>
+            )}
+          </div>
 
           <div className="flex justify-between text-sm">
             <span className="text-on-surface-variant">Captured</span>
