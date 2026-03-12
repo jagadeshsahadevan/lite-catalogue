@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useState, useEffect } from 'react';
+import { useReducer, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useProducts } from '../hooks/useProducts';
@@ -42,6 +42,7 @@ type Action =
   | { type: 'SET_MRP'; mrp: string | null; askQty: boolean }
   | { type: 'SET_QTY'; qty: number | null }
   | { type: 'DONE_ADDING'; askMrp: boolean }
+  | { type: 'DELETE_IMAGE'; index: number }
   | { type: 'RESET' };
 
 const initialState: State = {
@@ -140,6 +141,11 @@ function reducer(state: State, action: Action): State {
     case 'DONE_ADDING': {
       const isReshoot = !!state.mergeTargetId;
       return { ...state, step: isReshoot ? 'confirming' : (action.askMrp ? 'mrp_input' : 'confirming') };
+    }
+
+    case 'DELETE_IMAGE': {
+      const newImages = state.images.filter((_, i) => i !== action.index);
+      return { ...state, images: newImages, photoIndex: newImages.length };
     }
 
     case 'RESET':
@@ -274,11 +280,52 @@ function TagStepIndicator({
   );
 }
 
+const SUPPRESS_DELETE_WARN_KEY = 'liteCat_suppressDeleteWarn';
+
 export function CapturePage() {
   const { settings } = useSettings();
   const { createProduct, replaceAllImages, getDuplicateInfo } = useProducts();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  const [selectedThumbIdx, setSelectedThumbIdx] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ index: number } | null>(null);
+  const [suppressWarn, setSuppressWarn] = useState(false);
+  const suppressRef = useRef(
+    () => localStorage.getItem(SUPPRESS_DELETE_WARN_KEY) === 'true',
+  );
+
+  const handleThumbTap = useCallback((index: number) => {
+    setSelectedThumbIdx((prev) => {
+      if (prev === index) {
+        if (suppressRef.current()) {
+          dispatch({ type: 'DELETE_IMAGE', index });
+          return null;
+        }
+        setDeleteConfirm({ index });
+        return prev;
+      }
+      return index;
+    });
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (!deleteConfirm) return;
+    if (suppressWarn) {
+      localStorage.setItem(SUPPRESS_DELETE_WARN_KEY, 'true');
+      suppressRef.current = () => true;
+    }
+    dispatch({ type: 'DELETE_IMAGE', index: deleteConfirm.index });
+    setDeleteConfirm(null);
+    setSelectedThumbIdx(null);
+    setSuppressWarn(false);
+  }, [deleteConfirm, suppressWarn]);
+
+  const cancelDelete = useCallback(() => {
+    setDeleteConfirm(null);
+    setSelectedThumbIdx(null);
+    setSuppressWarn(false);
+  }, []);
 
   const { captureMode, askMrp, askQty } = settings;
   const allTags = [...PRESET_TAGS, ...settings.customTags];
@@ -364,7 +411,22 @@ export function CapturePage() {
           {state.images.length > 0 && state.step !== 'confirming' && (
             <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0">
               {state.images.map((img, i) => (
-                <PhotoPreview key={i} blob={img.blob} tag={img.tag || '?'} size="sm" />
+                <button
+                  key={i}
+                  onClick={() => handleThumbTap(i)}
+                  className={`relative flex-shrink-0 rounded-[var(--md-shape-sm)] transition-all ${
+                    selectedThumbIdx === i
+                      ? 'ring-2 ring-error scale-95'
+                      : ''
+                  }`}
+                >
+                  <PhotoPreview blob={img.blob} tag={img.tag || '?'} size="sm" />
+                  {selectedThumbIdx === i && (
+                    <div className="absolute inset-0 bg-error/30 rounded-[var(--md-shape-sm)] flex items-center justify-center">
+                      <Icon name="delete" size={20} className="text-white drop-shadow" />
+                    </div>
+                  )}
+                </button>
               ))}
             </div>
           )}
@@ -490,6 +552,41 @@ export function CapturePage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={cancelDelete}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-surface rounded-[var(--md-shape-lg)] w-[min(90%,320px)] p-6 space-y-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-medium text-on-surface">Delete photo?</h3>
+            <p className="text-sm text-on-surface-variant">
+              This will remove the captured photo. You can retake it.
+            </p>
+
+            <label className="flex items-center gap-3 cursor-pointer py-1">
+              <input
+                type="checkbox"
+                checked={suppressWarn}
+                onChange={(e) => setSuppressWarn(e.target.checked)}
+                className="w-5 h-5 rounded border-outline accent-primary"
+              />
+              <span className="text-sm text-on-surface-variant">Don't warn me again</span>
+            </label>
+
+            <div className="flex gap-3 pt-1">
+              <MD3Button variant="text" onClick={cancelDelete} className="flex-1">
+                Cancel
+              </MD3Button>
+              <MD3Button variant="filled" onClick={confirmDelete} className="flex-1 !bg-error">
+                Delete
+              </MD3Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
