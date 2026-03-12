@@ -29,6 +29,10 @@ export function ProductDetailPage() {
   const [editingQty, setEditingQty] = useState(false);
   const [qtyValue, setQtyValue] = useState('');
 
+  // Delete confirmation state
+  const [showDeleteProduct, setShowDeleteProduct] = useState(false);
+  const [pendingDeleteImageId, setPendingDeleteImageId] = useState<number | null>(null);
+
   const reload = useCallback(() => {
     if (!id) return;
     getProductWithImages(Number(id)).then((data) => {
@@ -47,17 +51,15 @@ export function ProductDetailPage() {
 
   const handleDelete = async () => {
     if (!product?.id) return;
-    if (window.confirm('Delete this product? This cannot be undone.')) {
-      await deleteProduct(product.id);
-      navigate('/products');
-    }
+    await deleteProduct(product.id);
+    navigate('/products');
   };
 
   const handleDeleteImage = async (imageId: number) => {
-    if (!window.confirm('Delete this photo?')) return;
     await deleteImage(imageId);
     const remaining = images.filter((img) => img.id !== imageId);
     setImages(remaining);
+    setPendingDeleteImageId(null);
     if (remaining.length === 0 && product?.id) {
       await deleteProduct(product.id);
       navigate('/products');
@@ -225,7 +227,7 @@ export function ProductDetailPage() {
                     <PhotoPreview blob={img.blob} size="lg" />
                     {/* Delete photo */}
                     <button
-                      onClick={() => img.id && handleDeleteImage(img.id)}
+                      onClick={() => img.id && setPendingDeleteImageId(img.id)}
                       className="absolute -top-2 -right-2 w-7 h-7 bg-error text-on-error rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform"
                     >
                       <Icon name="close" size={14} />
@@ -263,7 +265,7 @@ export function ProductDetailPage() {
 
         {/* Delete product - in sticky CTA */}
         <StickyBottomCTA>
-          <MD3Button variant="outlined" fullWidth onClick={handleDelete} className="!border-error !text-error">
+          <MD3Button variant="outlined" fullWidth onClick={() => setShowDeleteProduct(true)} className="!border-error !text-error">
             <span className="flex items-center justify-center gap-2">
               <Icon name="delete" size={18} />
               Delete Product
@@ -271,6 +273,40 @@ export function ProductDetailPage() {
           </MD3Button>
         </StickyBottomCTA>
       </div>
+
+      {/* Delete product confirmation */}
+      {showDeleteProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteProduct(false)}>
+          <div className="bg-surface rounded-[var(--md-shape-lg)] p-6 mx-6 max-w-sm w-full shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <Icon name="warning" size={24} className="text-error flex-shrink-0" />
+              <h3 className="text-lg font-medium text-on-surface">Delete Product</h3>
+            </div>
+            <p className="text-sm text-on-surface-variant">Delete this product and all its photos? This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <MD3Button variant="text" onClick={() => setShowDeleteProduct(false)}>Cancel</MD3Button>
+              <MD3Button variant="filled" onClick={handleDelete} className="!bg-error !text-on-error">Delete</MD3Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete photo confirmation */}
+      {pendingDeleteImageId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPendingDeleteImageId(null)}>
+          <div className="bg-surface rounded-[var(--md-shape-lg)] p-6 mx-6 max-w-sm w-full shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <Icon name="warning" size={24} className="text-error flex-shrink-0" />
+              <h3 className="text-lg font-medium text-on-surface">Delete Photo</h3>
+            </div>
+            <p className="text-sm text-on-surface-variant">Delete this photo?</p>
+            <div className="flex gap-2 justify-end">
+              <MD3Button variant="text" onClick={() => setPendingDeleteImageId(null)}>Cancel</MD3Button>
+              <MD3Button variant="filled" onClick={() => handleDeleteImage(pendingDeleteImageId)} className="!bg-error !text-on-error">Delete</MD3Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

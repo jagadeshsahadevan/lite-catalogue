@@ -136,60 +136,11 @@ export function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Share files via Web Share API. Falls back to download if not supported.
- */
-export async function shareProducts(
-  productIds: number[],
-  format: ExportFormat,
-  target: 'email' | 'gdrive',
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const [zipBlob, logBlob] = await Promise.all([
-      buildProductImageZip(productIds),
-      buildLogFile(productIds, format),
-    ]);
-
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yyyy = now.getFullYear();
-    const dateStr = `${dd}-${mm}-${yyyy}`;
-
-    const zipFile = new File([zipBlob], `products-${dateStr}.zip`, { type: 'application/zip' });
-    const logFile = new File([logBlob], `log-${dateStr}.${format}`, { type: MIME_MAP[format] });
-
-    const files = [zipFile, logFile];
-
-    // Check combined size for email
-    const totalSize = zipBlob.size + logBlob.size;
-    if (target === 'email' && totalSize > GMAIL_ATTACHMENT_LIMIT) {
-      return {
-        success: false,
-        error: `Total size (${formatSize(totalSize)}) exceeds Gmail's 25 MB attachment limit. Try Google Drive instead.`,
-      };
-    }
-
-    // Try Web Share API
-    if (navigator.canShare && navigator.canShare({ files })) {
-      await navigator.share({
-        files,
-        title: `Product Data - ${dateStr}`,
-      });
-      return { success: true };
-    }
-
-    // Fallback: download files
-    downloadBlob(zipBlob, `products-${dateStr}.zip`);
-    downloadBlob(logBlob, `log-${dateStr}.${format}`);
-    return { success: true };
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      // User cancelled the share dialog
-      return { success: false, error: 'Share cancelled' };
-    }
-    return { success: false, error: err instanceof Error ? err.message : 'Share failed' };
-  }
+function getDateStr(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${now.getFullYear()}`;
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -197,6 +148,125 @@ function downloadBlob(blob: Blob, filename: string) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+async function tryNativeShare(files: File[], title: string): Promise<boolean> {
+  if (typeof navigator.share !== 'function') return false;
+  if (typeof navigator.canShare !== 'function') return false;
+
+  try {
+    if (!navigator.canShare({ files })) return false;
+    await navigator.share({ files, title });
+    return true;
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw err;
+    }
+    return false;
+  }
+}
+
+/**
+ * Share product data. Prefers native share sheet, falls back to download.
+ * Strategy: share only the CSV log first (widely supported), then attempt
+ * to share the zip separately if native share is available.
+ */
+export async function shareProducts(
+  productIds: number[],
+  format: ExportFormat,
+  _target: 'email' | 'gdrive' = 'email',
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const dateStr = getDateStr();
+
+    const logBlob = await buildLogFile(productIds, format);
+    const logFile = new File(
+      [logBlob],
+      `catalogue-${dateStr}.${format}`,
+      { type: MIME_MAP[format] },
+    );
+
+    // Attempt native share with just the log file first (most compatible)
+    const shared = await tryNativeShare(
+      [logFile],
+      `Product Catalogue - ${dateStr}`,
+    );
+
+    if (shared) return { success: true };
+
+    // Native share unavailable — try text-only share (works on iOS standalone)
+    if (typeof navigator.share === 'function') {
+      try {
+        const text = await logBlob.text();
+        await navigator.share({
+          title: `Product Catalogue - ${dateStr}`,
+          text,
+        });
+        return { success: true };
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return { success: false, error: 'Share cancelled' };
+        }
+        // Fall through to download
+      }
+    }
+
+    // Final fallback: download
+    downloadBlob(logBlob, `catalogue-${dateStr}.${format}`);
+    return { success: true };
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { success: false, error: 'Share cancelled' };
+    }
+    return { success: false, error: err instanceof Error ? err.message : 'Share failed' };
+  }
+}
+
+/**
+ * Share with images (zip). Tries native share, falls back to download.
+ */
+export async function shareProductsWithImages(
+  productIds: number[],
+  format: ExportFormat,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const dateStr = getDateStr();
+    const [zipBlob, logBlob] = await Promise.all([
+      buildProductImageZip(productIds),
+      buildLogFile(productIds, format),
+    ]);
+
+    const zipFile = new File([zipBlob], `products-${dateStr}.zip`, { type: 'application/zip' });
+    const logFile = new File([logBlob], `catalogue-${dateStr}.${format}`, { type: MIME_MAP[format] });
+
+    // Try sharing both files
+    const sharedBoth = await tryNativeShare(
+      [logFile, zipFile],
+      `Product Catalogue - ${dateStr}`,
+    );
+    if (sharedBoth) return { success: true };
+
+    // Try sharing just the zip
+    const sharedZip = await tryNativeShare(
+      [zipFile],
+      `Product Images - ${dateStr}`,
+    );
+    if (sharedZip) return { success: true };
+
+    // Fallback: download both
+    downloadBlob(zipBlob, `products-${dateStr}.zip`);
+    downloadBlob(logBlob, `catalogue-${dateStr}.${format}`);
+    return { success: true };
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { success: false, error: 'Share cancelled' };
+    }
+    return { success: false, error: err instanceof Error ? err.message : 'Share failed' };
+  }
 }

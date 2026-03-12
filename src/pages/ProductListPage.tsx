@@ -37,6 +37,7 @@ export function ProductListPage() {
   const [activeDateFilter, setActiveDateFilter] = useState<DateFilter | undefined>();
 
   const [sharing, setSharing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const selectMode = selected.size > 0;
 
@@ -76,11 +77,11 @@ export function ProductListPage() {
   };
 
   const handleDeleteSelected = async () => {
-    if (!window.confirm(`Delete ${selected.size} product(s)? This cannot be undone.`)) return;
     for (const id of selected) {
       await deleteProduct(id);
     }
     setSelected(new Set());
+    setConfirmDelete(false);
     loadProducts();
   };
 
@@ -303,7 +304,7 @@ export function ProductListPage() {
           <div className="flex gap-2">
             <MD3Button
               variant="outlined"
-              onClick={handleDeleteSelected}
+              onClick={() => setConfirmDelete(true)}
               className="flex-1 !border-error !text-error"
             >
               <span className="flex items-center justify-center gap-1.5">
@@ -331,6 +332,28 @@ export function ProductListPage() {
             </MD3Button>
           </div>
         </StickyBottomCTA>
+      )}
+
+      {/* Delete confirmation dialog */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmDelete(false)}>
+          <div
+            className="bg-surface rounded-[var(--md-shape-lg)] p-6 mx-6 max-w-sm w-full shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <Icon name="warning" size={24} className="text-error flex-shrink-0" />
+              <h3 className="text-lg font-medium text-on-surface">Delete Products</h3>
+            </div>
+            <p className="text-sm text-on-surface-variant">
+              Delete {selected.size} product{selected.size > 1 ? 's' : ''}? This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <MD3Button variant="text" onClick={() => setConfirmDelete(false)}>Cancel</MD3Button>
+              <MD3Button variant="filled" onClick={handleDeleteSelected} className="!bg-error !text-on-error">Delete</MD3Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

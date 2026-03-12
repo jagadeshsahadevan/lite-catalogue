@@ -54,11 +54,18 @@ export function BarcodeScanner({ onScan }: Props) {
         <p className="text-sm text-on-surface-variant mt-1">Point camera at the product barcode</p>
       </div>
 
-      <div
-        id="barcode-scanner"
-        className="w-full max-w-sm rounded-[var(--md-shape-md)] overflow-hidden bg-black"
-        style={{ minHeight: 250 }}
-      />
+      <div className="relative w-full max-w-sm">
+        <div
+          id="barcode-scanner"
+          className="w-full rounded-[var(--md-shape-md)] overflow-hidden bg-black barcode-guide"
+          style={{ minHeight: 250 }}
+        />
+        {isScanning && (
+          <p className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-white/70 pointer-events-none drop-shadow">
+            Align barcode within the box
+          </p>
+        )}
+      </div>
 
       {error && (
         <div className="text-on-error-container text-sm bg-error-container p-3 rounded-[var(--md-shape-sm)] w-full max-w-sm">

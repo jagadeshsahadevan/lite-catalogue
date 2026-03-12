@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
-  const { videoRef, isActive, error, start, stop, capture, switchCamera, retry } = useCamera();
+  const { videoRef, isActive, error, torchOn, torchSupported, start, stop, capture, switchCamera, retry, toggleTorch } = useCamera();
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -67,13 +67,19 @@ export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
         {bottomSlot}
 
         <div className="flex items-center justify-center gap-6">
-          <button
-            onClick={switchCamera}
-            className="w-11 h-11 rounded-full bg-surface-container flex items-center justify-center active:bg-surface-container-high"
-            title="Switch camera"
-          >
-            <Icon name="swap-camera" size={22} className="text-on-surface-variant" />
-          </button>
+          {torchSupported ? (
+            <button
+              onClick={toggleTorch}
+              className={`w-11 h-11 rounded-full flex items-center justify-center ${
+                torchOn ? 'bg-yellow-400 text-black' : 'bg-surface-container text-on-surface-variant active:bg-surface-container-high'
+              }`}
+              title={torchOn ? 'Flash off' : 'Flash on'}
+            >
+              <Icon name={torchOn ? 'flash-on' : 'flash-off'} size={22} />
+            </button>
+          ) : (
+            <div className="w-11 h-11" />
+          )}
 
           <button
             onClick={handleCapture}
@@ -85,7 +91,13 @@ export function PhotoCapture({ onCapture, label, bottomSlot }: Props) {
             <span className="absolute inset-1 rounded-full bg-white border-2 border-outline-variant active:bg-surface-dim" />
           </button>
 
-          <div className="w-11 h-11" />
+          <button
+            onClick={switchCamera}
+            className="w-11 h-11 rounded-full bg-surface-container flex items-center justify-center active:bg-surface-container-high"
+            title="Switch camera"
+          >
+            <Icon name="swap-camera" size={22} className="text-on-surface-variant" />
+          </button>
         </div>
       </div>
     </div>

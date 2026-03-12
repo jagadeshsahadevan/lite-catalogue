@@ -136,6 +136,37 @@ body {
   border-radius: var(--md-shape-md);
 }
 
+#barcode-scanner #qr-shaded-region {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+#barcode-scanner #qr-shaded-region > div {
+  background: var(--md-primary) !important;
+  border-radius: 2px;
+}
+
+@keyframes scan-line {
+  0%, 100% { top: 0; }
+  50% { top: calc(100% - 3px); }
+}
+
+.barcode-guide {
+  position: relative;
+  pointer-events: none;
+}
+
+.barcode-guide::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--md-primary);
+  box-shadow: 0 0 8px var(--md-primary);
+  border-radius: 1px;
+  animation: scan-line 2s ease-in-out infinite;
+}
+
 /* ─── Camera viewfinder ─── */
 .camera-viewfinder video {
   width: 100%;

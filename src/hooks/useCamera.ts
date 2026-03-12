@@ -5,11 +5,14 @@ interface UseCamera {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   isActive: boolean;
   error: string | null;
+  torchOn: boolean;
+  torchSupported: boolean;
   start: () => Promise<void>;
   stop: () => void;
   capture: () => Promise<Blob | null>;
   switchCamera: () => Promise<void>;
   retry: () => Promise<void>;
+  toggleTorch: () => Promise<void>;
 }
 
 function parseCameraError(err: unknown): string {
@@ -35,6 +38,8 @@ export function useCamera(): UseCamera {
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
 
   const stop = useCallback(() => {
     if (streamRef.current) {
@@ -45,6 +50,8 @@ export function useCamera(): UseCamera {
       videoRef.current.srcObject = null;
     }
     setIsActive(false);
+    setTorchOn(false);
+    setTorchSupported(false);
   }, []);
 
   const startWithMode = useCallback(
@@ -80,6 +87,17 @@ export function useCamera(): UseCamera {
           await videoRef.current.play();
         }
         setIsActive(true);
+        setTorchOn(false);
+
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          try {
+            const caps = track.getCapabilities?.() as Record<string, unknown> | undefined;
+            setTorchSupported(!!caps?.torch);
+          } catch {
+            setTorchSupported(false);
+          }
+        }
       } catch (err) {
         setError(parseCameraError(err));
       }
@@ -134,11 +152,23 @@ export function useCamera(): UseCamera {
     });
   }, [isActive]);
 
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      const next = !torchOn;
+      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      setTorchOn(next);
+    } catch {
+      // torch not supported on this track
+    }
+  }, [torchOn]);
+
   useEffect(() => {
     return () => {
       stop();
     };
   }, [stop]);
 
-  return { videoRef, isActive, error, start, stop, capture, switchCamera, retry };
+  return { videoRef, isActive, error, torchOn, torchSupported, start, stop, capture, switchCamera, retry, toggleTorch };
 }
