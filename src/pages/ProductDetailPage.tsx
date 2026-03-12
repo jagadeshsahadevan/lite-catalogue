@@ -207,6 +207,20 @@ export function ProductDetailPage() {
             )}
           </div>
 
+          {product.brand && (
+            <div className="flex justify-between text-sm">
+              <span className="text-on-surface-variant">Brand</span>
+              <span className="font-medium text-on-surface">{product.brand}</span>
+            </div>
+          )}
+
+          {product.category && (
+            <div className="flex justify-between text-sm">
+              <span className="text-on-surface-variant">Category</span>
+              <span className="font-medium text-on-surface">{product.category}</span>
+            </div>
+          )}
+
           <div className="flex justify-between text-sm">
             <span className="text-on-surface-variant">Captured</span>
             <span className="text-on-surface">{product.capturedAt.toLocaleString()}</span>

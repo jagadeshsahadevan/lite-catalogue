@@ -62,6 +62,8 @@ export async function buildLogFile(productIds: number[], format: ExportFormat): 
     'Barcode',
     'MRP',
     'Qty',
+    'Brand',
+    'Category',
     'Position Tag',
     'Image Name',
     'Image Path',
@@ -77,11 +79,12 @@ export async function buildLogFile(productIds: number[], format: ExportFormat): 
     const images = await db.images.where('productId').equals(pid).toArray();
 
     if (images.length === 0) {
-      // Product with no images — still include a row
       rows.push([
         product.barcode,
         product.mrp || '',
         product.qty != null ? String(product.qty) : '',
+        product.brand || '',
+        product.category || '',
         '',
         '',
         '',
@@ -96,6 +99,8 @@ export async function buildLogFile(productIds: number[], format: ExportFormat): 
           product.barcode,
           product.mrp || '',
           product.qty != null ? String(product.qty) : '',
+          product.brand || '',
+          product.category || '',
           img.positionTag,
           imageName,
           imagePath,

@@ -6,6 +6,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { PhotoCapture } from '../components/PhotoCapture';
 import { MrpInput } from '../components/MrpInput';
 import { QtyInput } from '../components/QtyInput';
+import { ComboBoxInput } from '../components/ComboBoxInput';
 import { ConfirmationView } from '../components/ConfirmationView';
 import { PhotoPreview } from '../components/PhotoPreview';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
@@ -18,7 +19,14 @@ import { sanitizeBarcode } from '../utils/constants';
 import { PRESET_TAGS } from '../types';
 import type { CapturedImage, CaptureMode, DuplicateInfo } from '../types';
 
-type Step = 'scanning' | 'duplicate_prompt' | 'photographing' | 'mrp_input' | 'qty_input' | 'confirming';
+type Step = 'scanning' | 'duplicate_prompt' | 'photographing' | 'mrp_input' | 'qty_input' | 'brand_input' | 'category_input' | 'confirming';
+
+interface StepFlags {
+  askMrp: boolean;
+  askQty: boolean;
+  askBrand: boolean;
+  askCategory: boolean;
+}
 
 interface State {
   step: Step;
@@ -26,6 +34,8 @@ interface State {
   images: CapturedImage[];
   mrp: string | null;
   qty: number | null;
+  brand: string | null;
+  category: string | null;
   photoIndex: number;
   mergeTargetId: number | null;
   replaceMode: boolean;
@@ -38,11 +48,13 @@ type Action =
   | { type: 'DUPLICATE_FOUND'; barcode: string; duplicates: DuplicateInfo[] }
   | { type: 'RESHOOT_CHOSEN'; productId: number }
   | { type: 'NEW_PRODUCT_CHOSEN' }
-  | { type: 'CAPTURE'; blob: Blob; captureMode: CaptureMode; askMrp: boolean; askQty: boolean; allTags: string[] }
+  | { type: 'CAPTURE'; blob: Blob; captureMode: CaptureMode; flags: StepFlags; allTags: string[] }
   | { type: 'SELECT_TAG'; tag: string }
-  | { type: 'SET_MRP'; mrp: string | null; askQty: boolean }
-  | { type: 'SET_QTY'; qty: number | null }
-  | { type: 'DONE_ADDING'; askMrp: boolean }
+  | { type: 'SET_MRP'; mrp: string | null; flags: StepFlags }
+  | { type: 'SET_QTY'; qty: number | null; flags: StepFlags }
+  | { type: 'SET_BRAND'; brand: string | null; flags: StepFlags }
+  | { type: 'SET_CATEGORY'; category: string | null }
+  | { type: 'DONE_ADDING'; flags: StepFlags }
   | { type: 'DELETE_IMAGE'; index: number }
   | { type: 'RESET' };
 
@@ -52,6 +64,8 @@ const initialState: State = {
   images: [],
   mrp: null,
   qty: null,
+  brand: null,
+  category: null,
   photoIndex: 0,
   mergeTargetId: null,
   replaceMode: false,
@@ -65,10 +79,30 @@ function getNextTag(currentTag: string, allTags: string[]): string {
   return allTags[idx + 1];
 }
 
-function nextStepAfterPhotos(askMrp: boolean, askQty: boolean, isReshoot: boolean): Step {
-  if (isReshoot) return 'confirming'; // reshoot skips MRP & qty
-  if (askMrp) return 'mrp_input';
-  if (askQty) return 'qty_input';
+function nextStepAfterPhotos(flags: StepFlags, isReshoot: boolean): Step {
+  if (isReshoot) return 'confirming';
+  if (flags.askMrp) return 'mrp_input';
+  if (flags.askQty) return 'qty_input';
+  if (flags.askBrand) return 'brand_input';
+  if (flags.askCategory) return 'category_input';
+  return 'confirming';
+}
+
+function nextStepAfterMrp(flags: StepFlags): Step {
+  if (flags.askQty) return 'qty_input';
+  if (flags.askBrand) return 'brand_input';
+  if (flags.askCategory) return 'category_input';
+  return 'confirming';
+}
+
+function nextStepAfterQty(flags: StepFlags): Step {
+  if (flags.askBrand) return 'brand_input';
+  if (flags.askCategory) return 'category_input';
+  return 'confirming';
+}
+
+function nextStepAfterBrand(flags: StepFlags): Step {
+  if (flags.askCategory) return 'category_input';
   return 'confirming';
 }
 
@@ -97,7 +131,7 @@ function reducer(state: State, action: Action): State {
           ...state,
           images: newImages,
           photoIndex: newIndex,
-          step: nextStepAfterPhotos(action.askMrp, action.askQty, isReshoot),
+          step: nextStepAfterPhotos(action.flags, isReshoot),
           selectedTag: 'Front',
         };
       }
@@ -116,7 +150,7 @@ function reducer(state: State, action: Action): State {
           ...state,
           images: newImages,
           photoIndex: newIndex,
-          step: nextStepAfterPhotos(action.askMrp, action.askQty, isReshoot),
+          step: nextStepAfterPhotos(action.flags, isReshoot),
         };
       }
 
@@ -134,14 +168,20 @@ function reducer(state: State, action: Action): State {
       return { ...state, selectedTag: action.tag };
 
     case 'SET_MRP':
-      return { ...state, mrp: action.mrp, step: action.askQty ? 'qty_input' : 'confirming' };
+      return { ...state, mrp: action.mrp, step: nextStepAfterMrp(action.flags) };
 
     case 'SET_QTY':
-      return { ...state, qty: action.qty, step: 'confirming' };
+      return { ...state, qty: action.qty, step: nextStepAfterQty(action.flags) };
+
+    case 'SET_BRAND':
+      return { ...state, brand: action.brand, step: nextStepAfterBrand(action.flags) };
+
+    case 'SET_CATEGORY':
+      return { ...state, category: action.category, step: 'confirming' };
 
     case 'DONE_ADDING': {
       const isReshoot = !!state.mergeTargetId;
-      return { ...state, step: isReshoot ? 'confirming' : (action.askMrp ? 'mrp_input' : 'confirming') };
+      return { ...state, step: isReshoot ? 'confirming' : nextStepAfterPhotos(action.flags, false) };
     }
 
     case 'DELETE_IMAGE': {
@@ -285,9 +325,21 @@ const SUPPRESS_DELETE_WARN_KEY = 'liteCat_suppressDeleteWarn';
 
 export function CapturePage() {
   const { settings } = useSettings();
-  const { createProduct, replaceAllImages, getDuplicateInfo } = useProducts();
+  const { createProduct, replaceAllImages, getDuplicateInfo, getDistinctBrands, getDistinctCategories, getLastUsedBrand, getLastUsedCategory } = useProducts();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [lastBrand, setLastBrand] = useState('');
+  const [lastCategory, setLastCategory] = useState('');
+
+  useEffect(() => {
+    getDistinctBrands().then(setBrandOptions);
+    getDistinctCategories().then(setCategoryOptions);
+    getLastUsedBrand().then(setLastBrand);
+    getLastUsedCategory().then(setLastCategory);
+  }, [getDistinctBrands, getDistinctCategories, getLastUsedBrand, getLastUsedCategory]);
 
   const [selectedThumbIdx, setSelectedThumbIdx] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ index: number } | null>(null);
@@ -328,7 +380,8 @@ export function CapturePage() {
     setSuppressWarn(false);
   }, []);
 
-  const { captureMode, askMrp, askQty } = settings;
+  const { captureMode, askMrp, askQty, askBrand, askCategory } = settings;
+  const stepFlags: StepFlags = { askMrp, askQty, askBrand, askCategory };
   const allTags = [...PRESET_TAGS, ...settings.customTags];
 
   const handleScan = useCallback(async (raw: string) => {
@@ -345,9 +398,9 @@ export function CapturePage() {
 
   const handleCapture = useCallback(
     (blob: Blob) => {
-      dispatch({ type: 'CAPTURE', blob, captureMode, askMrp, askQty, allTags });
+      dispatch({ type: 'CAPTURE', blob, captureMode, flags: stepFlags, allTags });
     },
-    [captureMode, askMrp, askQty, allTags],
+    [captureMode, stepFlags, allTags],
   );
 
   const handleTagSelect = useCallback((tag: string) => {
@@ -355,24 +408,37 @@ export function CapturePage() {
   }, []);
 
   const handleDoneAdding = useCallback(() => {
-    dispatch({ type: 'DONE_ADDING', askMrp });
-  }, [askMrp]);
+    dispatch({ type: 'DONE_ADDING', flags: stepFlags });
+  }, [stepFlags]);
 
   const handleMrp = useCallback((mrp: string | null) => {
-    dispatch({ type: 'SET_MRP', mrp, askQty });
-  }, [askQty]);
+    dispatch({ type: 'SET_MRP', mrp, flags: stepFlags });
+  }, [stepFlags]);
 
   const handleQty = useCallback((qty: number | null) => {
-    dispatch({ type: 'SET_QTY', qty });
+    dispatch({ type: 'SET_QTY', qty, flags: stepFlags });
+  }, [stepFlags]);
+
+  const handleBrand = useCallback((brand: string | null) => {
+    dispatch({ type: 'SET_BRAND', brand, flags: stepFlags });
+  }, [stepFlags]);
+
+  const handleCategory = useCallback((category: string | null) => {
+    dispatch({ type: 'SET_CATEGORY', category });
   }, []);
 
   const handleSave = useCallback(async () => {
     if (state.replaceMode && state.mergeTargetId) {
       await replaceAllImages(state.mergeTargetId, state.images);
     } else {
-      await createProduct(state.barcode, state.mrp, state.images, state.qty);
+      await createProduct(state.barcode, state.mrp, state.images, state.qty, state.brand, state.category);
     }
-  }, [createProduct, replaceAllImages, state]);
+    // Refresh options for next product
+    getDistinctBrands().then(setBrandOptions);
+    getDistinctCategories().then(setCategoryOptions);
+    if (state.brand) setLastBrand(state.brand);
+    if (state.category) setLastCategory(state.category);
+  }, [createProduct, replaceAllImages, state, getDistinctBrands, getDistinctCategories]);
 
   const handleNext = useCallback(async () => {
     await handleSave();
@@ -542,12 +608,38 @@ export function CapturePage() {
           </div>
         )}
 
+        {state.step === 'brand_input' && (
+          <div className="pt-4 overflow-y-auto">
+            <ComboBoxInput
+              label="Product Brand"
+              value={lastBrand}
+              options={brandOptions}
+              onSubmit={handleBrand}
+              placeholder="e.g. Samsung, Nike..."
+            />
+          </div>
+        )}
+
+        {state.step === 'category_input' && (
+          <div className="pt-4 overflow-y-auto">
+            <ComboBoxInput
+              label="Product Category"
+              value={lastCategory}
+              options={categoryOptions}
+              onSubmit={handleCategory}
+              placeholder="e.g. Electronics, Clothing..."
+            />
+          </div>
+        )}
+
         {state.step === 'confirming' && (
           <div className="overflow-y-auto pb-24 pt-2">
             <ConfirmationView
               barcode={state.barcode}
               mrp={state.mrp}
               qty={state.qty}
+              brand={state.brand}
+              category={state.category}
               images={state.images}
               onNext={handleNext}
               onDone={handleDone}

@@ -9,12 +9,14 @@ interface Props {
   barcode: string;
   mrp: string | null;
   qty?: number | null;
+  brand?: string | null;
+  category?: string | null;
   images: CapturedImage[];
   onNext: () => void;
   onDone: () => void;
 }
 
-export function ConfirmationView({ barcode, mrp, qty, images, onNext, onDone }: Props) {
+export function ConfirmationView({ barcode, mrp, qty, brand, category, images, onNext, onDone }: Props) {
   const groupedByTag = images.reduce<Record<string, CapturedImage[]>>((acc, img) => {
     (acc[img.tag] ??= []).push(img);
     return acc;
@@ -45,6 +47,18 @@ export function ConfirmationView({ barcode, mrp, qty, images, onNext, onDone }: 
             <div className="flex justify-between text-sm">
               <span className="text-on-surface-variant">Qty</span>
               <span className="font-medium text-on-surface">{qty}</span>
+            </div>
+          )}
+          {brand && (
+            <div className="flex justify-between text-sm">
+              <span className="text-on-surface-variant">Brand</span>
+              <span className="font-medium text-on-surface">{brand}</span>
+            </div>
+          )}
+          {category && (
+            <div className="flex justify-between text-sm">
+              <span className="text-on-surface-variant">Category</span>
+              <span className="font-medium text-on-surface">{category}</span>
             </div>
           )}
           <div className="flex justify-between text-sm">

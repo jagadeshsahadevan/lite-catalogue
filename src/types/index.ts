@@ -14,6 +14,8 @@ export interface AppSettings {
   captureMode: CaptureMode;
   askMrp: boolean;
   askQty: boolean;
+  askBrand: boolean;
+  askCategory: boolean;
   apiEndpoint: string;
   customTags: string[];
   setupComplete: boolean;
@@ -30,6 +32,8 @@ export interface Product {
   barcode: string;
   mrp: string | null;
   qty?: number | null;
+  brand?: string | null;
+  category?: string | null;
   capturedAt: Date;
 }
 
@@ -56,6 +60,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   captureMode: 'single',
   askMrp: true,
   askQty: false,
+  askBrand: false,
+  askCategory: false,
   apiEndpoint: '',
   customTags: [],
   setupComplete: false,

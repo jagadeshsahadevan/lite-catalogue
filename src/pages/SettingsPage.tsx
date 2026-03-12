@@ -172,6 +172,32 @@ export function SettingsPage() {
           <MD3Card variant="outlined">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm font-medium text-on-surface">Ask for Brand</p>
+                <p className="text-xs text-on-surface-variant">Brand name per product</p>
+              </div>
+              <MD3Switch
+                checked={settings.askBrand}
+                onChange={(v) => updateSettings({ askBrand: v })}
+              />
+            </div>
+          </MD3Card>
+
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-on-surface">Ask for Category</p>
+                <p className="text-xs text-on-surface-variant">Category per product</p>
+              </div>
+              <MD3Switch
+                checked={settings.askCategory}
+                onChange={(v) => updateSettings({ askCategory: v })}
+              />
+            </div>
+          </MD3Card>
+
+          <MD3Card variant="outlined">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm font-medium text-on-surface">Haptic Feedback</p>
                 <p className="text-xs text-on-surface-variant">Vibrate on scan &amp; capture</p>
               </div>

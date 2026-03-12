@@ -9,11 +9,15 @@ export function useProducts() {
       mrp: string | null,
       images: CapturedImage[],
       qty?: number | null,
+      brand?: string | null,
+      category?: string | null,
     ): Promise<number> => {
       const productId = await db.products.add({
         barcode,
         mrp,
         qty: qty ?? null,
+        brand: brand ?? null,
+        category: category ?? null,
         capturedAt: new Date(),
       });
 
@@ -173,6 +177,40 @@ export function useProducts() {
     return db.images.where('productId').equals(productId).count();
   }, []);
 
+  const getDistinctBrands = useCallback(async (): Promise<string[]> => {
+    const all = await db.products.toArray();
+    const set = new Set<string>();
+    for (const p of all) {
+      if (p.brand) set.add(p.brand);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  const getDistinctCategories = useCallback(async (): Promise<string[]> => {
+    const all = await db.products.toArray();
+    const set = new Set<string>();
+    for (const p of all) {
+      if (p.category) set.add(p.category);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  const getLastUsedBrand = useCallback(async (): Promise<string> => {
+    const latest = await db.products.orderBy('capturedAt').reverse().limit(20).toArray();
+    for (const p of latest) {
+      if (p.brand) return p.brand;
+    }
+    return '';
+  }, []);
+
+  const getLastUsedCategory = useCallback(async (): Promise<string> => {
+    const latest = await db.products.orderBy('capturedAt').reverse().limit(20).toArray();
+    for (const p of latest) {
+      if (p.category) return p.category;
+    }
+    return '';
+  }, []);
+
   return {
     createProduct,
     addMoreImages,
@@ -188,5 +226,9 @@ export function useProducts() {
     updateProductMrp,
     updateProductQty,
     getImageCount,
+    getDistinctBrands,
+    getDistinctCategories,
+    getLastUsedBrand,
+    getLastUsedCategory,
   };
 }

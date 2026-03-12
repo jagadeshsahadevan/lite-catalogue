@@ -80,6 +80,18 @@ class CatalogueDB extends Dexie {
         delete product.syncStatus;
       });
     });
+
+    // v7: Add brand and category to products
+    this.version(7).stores({
+      settings: '++id',
+      products: '++id, barcode, capturedAt, brand, category',
+      images: '++id, productId, positionTag',
+    }).upgrade((tx) => {
+      return tx.table('products').toCollection().modify((product) => {
+        if (product.brand === undefined) product.brand = null;
+        if (product.category === undefined) product.category = null;
+      });
+    });
   }
 }
 
