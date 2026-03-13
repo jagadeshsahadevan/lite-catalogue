@@ -23,8 +23,13 @@ interface Props {
 }
 
 export function BarcodeScanner({ onScan }: Props) {
-  const [manual, setManual] = useState(false);
   const { isActive: tourActive, currentStep, nextStep: tourNext, markScanComplete } = useTour();
+  const isManualStep = currentStep?.id === 'manual-entry' || currentStep?.id === 'type-barcode';
+  const [manual, setManual] = useState(false);
+
+  useEffect(() => {
+    if (tourActive && isManualStep) setManual(true);
+  }, [tourActive, isManualStep]);
   const {
     start, stop, isScanning, error,
     torchOn, torchSupported, toggleTorch,
@@ -41,25 +46,19 @@ export function BarcodeScanner({ onScan }: Props) {
     }
   }, [onScan, tourActive, currentStep, tourNext, markScanComplete]);
 
+  // Start scanner on mount, stop only on unmount. Keep stream alive when switching to manual
+  // to avoid repeated camera permission prompts (especially on iOS).
   useEffect(() => {
-    if (!manual && !mountedRef.current) {
-      mountedRef.current = true;
-      const timer = setTimeout(() => {
-        start('barcode-scanner');
-      }, 100);
-      return () => {
-        clearTimeout(timer);
-        stop();
-        mountedRef.current = false;
-      };
-    }
+    mountedRef.current = true;
+    const timer = setTimeout(() => {
+      start('barcode-scanner');
+    }, 100);
     return () => {
-      if (mountedRef.current) {
-        stop();
-        mountedRef.current = false;
-      }
+      clearTimeout(timer);
+      stop();
+      mountedRef.current = false;
     };
-  }, [manual, start, stop]);
+  }, [start, stop]);
 
   useEffect(() => {
     if (!isScanning || !scanStartedAt || tourActive) {
@@ -77,35 +76,32 @@ export function BarcodeScanner({ onScan }: Props) {
     return () => clearInterval(timer);
   }, [isScanning, scanStartedAt, tourActive]);
 
-  if (manual) {
-    return (
-      <div>
-        <ManualBarcodeInput onSubmit={handleManualSubmit} />
-        <button
-          onClick={() => setManual(false)}
-          className="mt-3 w-full text-sm text-primary font-medium"
-        >
-          Switch to camera scanner
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="text-center">
-        <h2 className="text-lg font-semibold text-on-surface">Scan Barcode</h2>
-        <p className="text-sm text-on-surface-variant mt-1">Point camera at the product barcode</p>
-      </div>
+      {!manual && (
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-on-surface">Scan Barcode</h2>
+          <p className="text-sm text-on-surface-variant mt-1">Point camera at the product barcode</p>
+        </div>
+      )}
 
-      <div className="relative w-full max-w-sm">
+      {/* Scanner always in DOM; hidden off-screen when manual to keep camera stream alive and avoid re-prompting for permission */}
+      <div
+        className="relative w-full max-w-sm"
+        style={
+          manual
+            ? { position: 'absolute' as const, left: -9999, width: 1, height: 1, overflow: 'hidden' as const, visibility: 'hidden' as const }
+            : undefined
+        }
+        aria-hidden={manual}
+      >
         <div
           id="barcode-scanner"
           data-tour="barcode-scanner"
           className="w-full rounded-[var(--md-shape-md)] overflow-hidden bg-black barcode-guide"
           style={{ minHeight: 250 }}
         />
-        {isScanning && torchSupported && (
+        {!manual && isScanning && torchSupported && (
           <button
             data-tour="scanner-flash-btn"
             onClick={toggleTorch}
@@ -116,56 +112,69 @@ export function BarcodeScanner({ onScan }: Props) {
             <Icon name={torchOn ? 'flash-on' : 'flash-off'} size={20} />
           </button>
         )}
-        {isScanning && (
+        {!manual && isScanning && (
           <p className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-white/70 pointer-events-none drop-shadow">
             Align barcode within the box
           </p>
         )}
       </div>
 
-      {error && (
-        <div className="text-on-error-container text-sm bg-error-container p-3 rounded-[var(--md-shape-sm)] w-full max-w-sm">
-          <p>{error}</p>
-          <MD3Button
-            variant="outlined"
-            onClick={() => { stop(); start('barcode-scanner'); }}
-            className="mt-2"
-            icon={<Icon name="refresh" size={18} />}
+      {manual ? (
+        <>
+          <ManualBarcodeInput onSubmit={handleManualSubmit} />
+          <button
+            onClick={() => setManual(false)}
+            className="w-full text-sm text-primary font-medium"
           >
-            Retry
-          </MD3Button>
-        </div>
-      )}
+            Switch to camera scanner
+          </button>
+        </>
+      ) : (
+        <>
+          {error && (
+            <div className="text-on-error-container text-sm bg-error-container p-3 rounded-[var(--md-shape-sm)] w-full max-w-sm">
+              <p>{error}</p>
+              <MD3Button
+                variant="outlined"
+                onClick={() => { stop(); start('barcode-scanner'); }}
+                className="mt-2"
+                icon={<Icon name="refresh" size={18} />}
+              >
+                Retry
+              </MD3Button>
+            </div>
+          )}
 
-      {!isScanning && !error && (
-        <div className="text-on-surface-variant text-sm">Starting camera...</div>
-      )}
+          {!isScanning && !error && (
+            <div className="text-on-surface-variant text-sm">Starting camera...</div>
+          )}
 
-      <div className="w-full max-w-sm min-h-[32px]">
-        {tipIndex >= 0 && (
-          <div className="text-center text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-[var(--md-shape-sm)]">
-            {SCANNING_TIPS[tipIndex].text}
+          <div className="w-full max-w-sm min-h-[32px]">
+            {tipIndex >= 0 && (
+              <div className="text-center text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-[var(--md-shape-sm)]">
+                {SCANNING_TIPS[tipIndex].text}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <button
-        data-tour="manual-barcode-btn"
-        onClick={() => {
-          stop();
-          setManual(true);
-          if (tourActive && currentStep?.id === 'manual-entry') {
-            tourNext();
-          }
-        }}
-        className={`text-sm text-primary font-medium transition-all ${
-          tipIndex >= 0 && SCANNING_TIPS[tipIndex]?.action === 'manual'
-            ? 'bg-primary-container px-4 py-2 rounded-full animate-pulse shadow-sm'
-            : ''
-        }`}
-      >
-        Enter barcode manually
-      </button>
+          <button
+            data-tour="manual-barcode-btn"
+            onClick={() => {
+              setManual(true);
+              if (tourActive && currentStep?.id === 'manual-entry') {
+                tourNext();
+              }
+            }}
+            className={`text-sm text-primary font-medium transition-all ${
+              tipIndex >= 0 && SCANNING_TIPS[tipIndex]?.action === 'manual'
+                ? 'bg-primary-container px-4 py-2 rounded-full animate-pulse shadow-sm'
+                : ''
+            }`}
+          >
+            Enter barcode manually
+          </button>
+        </>
+      )}
     </div>
   );
 }

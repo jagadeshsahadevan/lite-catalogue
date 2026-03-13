@@ -262,6 +262,14 @@ export function useBarcodeScanner(onScan: (barcode: string) => void): UseBarcode
       setError(null);
 
       try {
+        // Pre-warm camera permission so it persists (avoids re-prompting on every start)
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+          stream.getTracks().forEach((t) => t.stop());
+        } catch {
+          // Ignore - will retry with scanner
+        }
+
         const scanner = new Html5Qrcode(elementId, {
           formatsToSupport: SUPPORTED_FORMATS,
           verbose: false,

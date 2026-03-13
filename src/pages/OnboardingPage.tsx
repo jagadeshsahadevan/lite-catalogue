@@ -16,10 +16,17 @@ export function OnboardingPage() {
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [brand, setBrand] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   const handleContinue = async () => {
     const mobile = phone.trim();
     const brandName = brand.trim();
+
+    if (mobile && !/^\d{10}$/.test(mobile)) {
+      setPhoneError('Enter 10 digits');
+      return;
+    }
+    setPhoneError('');
 
     await updateSettings({
       phoneNumber: mobile,
@@ -80,16 +87,20 @@ export function OnboardingPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1">
-              Mobile Number
+              Mobile Number <span className="text-on-surface-variant/50">(optional)</span>
             </label>
             <input
               type="tel"
               inputMode="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                setPhoneError('');
+              }}
               placeholder="e.g. 9876543210"
               className="w-full px-4 py-3 border border-outline rounded-[var(--md-shape-sm)] text-on-surface bg-transparent focus:outline-none focus:border-primary focus:border-2"
             />
+            {phoneError && <p className="text-xs text-error mt-1">{phoneError}</p>}
           </div>
 
           <div>

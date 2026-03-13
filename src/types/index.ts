@@ -41,6 +41,26 @@ export interface AppSettings {
   fieldOrder: string[];
 }
 
+/** Keys included in settings download/load (capture mode, field config, field order, field enum, haptic, etc.) */
+export const SETTINGS_EXPORT_KEYS: (keyof Omit<AppSettings, 'id'>)[] = [
+  'captureMode',
+  'askMrp',
+  'askQty',
+  'askBrand',
+  'askCategory',
+  'fieldOrder',
+  'customFields', // includes field enum (dropdown options)
+  'hapticFeedback',
+  'autoMrpDetection',
+  'customTags',
+  'brandName',
+  'phoneNumber',
+  'apiEndpoint',
+  'setupComplete',
+  'onboardingComplete',
+  'lastCsvDownloadDate',
+];
+
 export interface Product {
   id?: number;
   barcode: string;
