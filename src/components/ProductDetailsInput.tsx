@@ -101,6 +101,7 @@ interface Props {
   lastCategory: string;
   fieldOrder: string[];
   customFields: CustomFieldDef[];
+  customFieldOptionsMap?: Record<string, string[]>;
   onSubmit: (data: ProductDetailsData) => void;
   onAddMorePhotos?: () => void;
 }
@@ -110,7 +111,7 @@ export function ProductDetailsInput({
   autoMrpDetect, imageBlob, imageCount,
   brandOptions, categoryOptions,
   lastBrand, lastCategory,
-  fieldOrder, customFields,
+  fieldOrder, customFields, customFieldOptionsMap,
   onSubmit, onAddMorePhotos,
 }: Props) {
   const { extractMrp, isProcessing } = useOcr();
@@ -251,13 +252,16 @@ export function ProductDetailsInput({
         const val = customValues[cf.id] ?? '';
 
         if (cf.type === 'dropdown') {
+          const defOpts = cf.options ?? [];
+          const extraOpts = customFieldOptionsMap?.[cf.id] ?? [];
+          const mergedOpts = [...new Set([...defOpts, ...extraOpts])].sort((a, b) => a.localeCompare(b));
           return (
             <ComboField
               key={cf.id}
               label={cf.name}
               value={val}
               onChange={(v) => setCustomValue(cf.id, v)}
-              options={cf.options ?? []}
+              options={mergedOpts}
               placeholder={`Enter ${cf.name.toLowerCase()}`}
             />
           );

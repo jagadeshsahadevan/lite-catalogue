@@ -39,6 +39,8 @@ export interface AppSettings {
   lastCsvDownloadDate?: string | null;
   customFields: CustomFieldDef[];
   fieldOrder: string[];
+  brandOptions: string[];
+  categoryOptions: string[];
 }
 
 /** Keys included in settings download/load (capture mode, field config, field order, field enum, haptic, etc.) */
@@ -50,6 +52,8 @@ export const SETTINGS_EXPORT_KEYS: (keyof Omit<AppSettings, 'id'>)[] = [
   'askCategory',
   'fieldOrder',
   'customFields', // includes field enum (dropdown options)
+  'brandOptions',
+  'categoryOptions',
   'hapticFeedback',
   'autoMrpDetection',
   'customTags',
@@ -108,6 +112,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lastCsvDownloadDate: null,
   customFields: [],
   fieldOrder: ['mrp', 'qty', 'brand', 'category'],
+  brandOptions: [],
+  categoryOptions: [],
 };
 
 export const PRESET_TAGS = ['Front', 'Back', 'Left', 'Right', 'Top', 'Bottom', 'Label', 'Barcode'];

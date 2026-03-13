@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProducts } from '../hooks/useProducts';
+import { useDropdownSync } from '../hooks/useDropdownSync';
 import { useSettings } from '../context/SettingsContext';
 import { PhotoPreview } from '../components/PhotoPreview';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
@@ -17,6 +18,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate();
   const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty, updateProductBrand, updateProductCategory, updateProductCustomData, getDistinctBrands, getDistinctCategories, getDistinctCustomFieldValues } = useProducts();
   const { settings } = useSettings();
+  const { syncDropdownValues } = useDropdownSync();
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,9 +70,15 @@ export function ProductDetailPage() {
   useEffect(() => { reload(); }, [reload]);
 
   useEffect(() => {
-    getDistinctBrands().then(setBrandOptions);
-    getDistinctCategories().then(setCategoryOptions);
-  }, [getDistinctBrands, getDistinctCategories]);
+    getDistinctBrands().then((db) => {
+      const merged = [...new Set([...(settings.brandOptions ?? []), ...db])].sort((a, b) => a.localeCompare(b));
+      setBrandOptions(merged);
+    });
+    getDistinctCategories().then((db) => {
+      const merged = [...new Set([...(settings.categoryOptions ?? []), ...db])].sort((a, b) => a.localeCompare(b));
+      setCategoryOptions(merged);
+    });
+  }, [getDistinctBrands, getDistinctCategories, settings.brandOptions, settings.categoryOptions]);
 
   const handleDelete = async () => {
     if (!product?.id) return;
@@ -133,6 +141,7 @@ export function ProductDetailPage() {
     await updateProductBrand(product.id, brand);
     setProduct((prev) => prev ? { ...prev, brand } : prev);
     setEditingBrand(false);
+    syncDropdownValues({ brand });
   };
 
   const handleStartEditCategory = () => {
@@ -146,6 +155,7 @@ export function ProductDetailPage() {
     await updateProductCategory(product.id, category);
     setProduct((prev) => prev ? { ...prev, category } : prev);
     setEditingCategory(false);
+    syncDropdownValues({ category });
   };
 
   const handleStartEditCustom = async (fieldId: string) => {
@@ -169,6 +179,7 @@ export function ProductDetailPage() {
     await updateProductCustomData(product.id, updated);
     setProduct((prev) => prev ? { ...prev, customData: updated } : prev);
     setEditingCustomFieldId(null);
+    syncDropdownValues({ customData: { [editingCustomFieldId]: val } });
   };
 
   const canEditTags = true;

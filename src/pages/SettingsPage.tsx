@@ -9,6 +9,7 @@ import { MD3TopBar } from '../components/md3/MD3TopBar';
 import { MD3Button } from '../components/md3/MD3Button';
 import { Icon } from '../components/md3/Icon';
 import { CustomFieldDialog } from '../components/CustomFieldDialog';
+import { BuiltinFieldOptionsDialog } from '../components/BuiltinFieldOptionsDialog';
 import type { CaptureMode, AppSettings, CustomFieldDef } from '../types';
 import { BUILTIN_FIELD_IDS, DEFAULT_SETTINGS, SETTINGS_EXPORT_KEYS } from '../types';
 
@@ -37,6 +38,7 @@ export function SettingsPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [customFieldDialog, setCustomFieldDialog] = useState<CustomFieldDef | null | 'add'>(null);
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<CustomFieldDef | null>(null);
+  const [builtinOptionsDialog, setBuiltinOptionsDialog] = useState<'brand' | 'category' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = (field: 'phone' | 'brand') => {
@@ -153,6 +155,8 @@ export function SettingsPage() {
     if (typeof o.captureMode !== 'string' || !['single', 'front-back', 'front-back-more'].includes(o.captureMode)) return false;
     if (o.fieldOrder !== undefined && !Array.isArray(o.fieldOrder)) return false;
     if (o.customFields !== undefined && !Array.isArray(o.customFields)) return false;
+    if (o.brandOptions !== undefined && !Array.isArray(o.brandOptions)) return false;
+    if (o.categoryOptions !== undefined && !Array.isArray(o.categoryOptions)) return false;
     if (o.customFields && Array.isArray(o.customFields)) {
       for (const cf of o.customFields as unknown[]) {
         if (!cf || typeof cf !== 'object') return false;
@@ -199,6 +203,9 @@ export function SettingsPage() {
                 }
                 return c;
               });
+            }
+            if ((key === 'brandOptions' || key === 'categoryOptions') && Array.isArray(val)) {
+              val = (val as unknown[]).filter((v): v is string => typeof v === 'string' && v.trim() !== '');
             }
             (toApply as Record<string, unknown>)[key] = val;
           }
@@ -382,7 +389,19 @@ export function SettingsPage() {
                     )}
                   </div>
                   {isBuiltin ? (
-                    <MD3Switch checked={enabled} onChange={(v) => toggleFieldEnabled(fieldId, v)} />
+                    <div className="flex items-center gap-1">
+                      <MD3Switch checked={enabled} onChange={(v) => toggleFieldEnabled(fieldId, v)} />
+                      {(fieldId === 'brand' || fieldId === 'category') && (
+                        <button
+                          onClick={() => setBuiltinOptionsDialog(fieldId as 'brand' | 'category')}
+                          className="p-1.5 text-on-surface-variant hover:text-on-surface"
+                          aria-label={`Edit ${fieldId} options`}
+                          title="Edit dropdown options"
+                        >
+                          <Icon name="edit" size={18} />
+                        </button>
+                      )}
+                    </div>
                   ) : cf ? (
                     <div className="flex items-center gap-1">
                       <MD3Switch checked={enabled} onChange={toggleCustomEnabled} />
@@ -630,6 +649,22 @@ export function SettingsPage() {
           field={customFieldDialog === 'add' ? null : customFieldDialog}
           onSave={handleSaveCustomField}
           onClose={() => setCustomFieldDialog(null)}
+        />
+      )}
+
+      {/* Builtin field options dialog (Brand / Category) */}
+      {builtinOptionsDialog && (
+        <BuiltinFieldOptionsDialog
+          fieldLabel={builtinOptionsDialog === 'brand' ? 'Brand' : 'Category'}
+          options={builtinOptionsDialog === 'brand' ? (settings.brandOptions ?? []) : (settings.categoryOptions ?? [])}
+          onSave={(opts) => {
+            if (builtinOptionsDialog === 'brand') {
+              updateSettings({ brandOptions: opts });
+            } else {
+              updateSettings({ categoryOptions: opts });
+            }
+          }}
+          onClose={() => setBuiltinOptionsDialog(null)}
         />
       )}
 

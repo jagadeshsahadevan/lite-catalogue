@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useTour } from '../context/TourContext';
 import { useProducts } from '../hooks/useProducts';
+import { useDropdownSync } from '../hooks/useDropdownSync';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { PhotoCapture } from '../components/PhotoCapture';
 import { ProductDetailsInput } from '../components/ProductDetailsInput';
@@ -290,8 +291,9 @@ const SUPPRESS_DELETE_WARN_KEY = 'liteCat_suppressDeleteWarn';
 
 export function CapturePage() {
   const { settings } = useSettings();
-  const { createProduct, replaceAllImages, getDuplicateInfo, getDistinctBrands, getDistinctCategories, getLastUsedBrand, getLastUsedCategory } = useProducts();
+  const { createProduct, replaceAllImages, getDuplicateInfo, getDistinctBrands, getDistinctCategories, getDistinctCustomFieldValues, getLastUsedBrand, getLastUsedCategory } = useProducts();
   const { registerAutoScan, startTour, isActive: tourActive } = useTour();
+  const { syncDropdownValues } = useDropdownSync();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -299,13 +301,32 @@ export function CapturePage() {
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [lastBrand, setLastBrand] = useState('');
   const [lastCategory, setLastCategory] = useState('');
+  const [customFieldOptionsMap, setCustomFieldOptionsMap] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
-    getDistinctBrands().then(setBrandOptions);
-    getDistinctCategories().then(setCategoryOptions);
+    getDistinctBrands().then((db) => {
+      const merged = [...new Set([...(settings.brandOptions ?? []), ...db])].sort((a, b) => a.localeCompare(b));
+      setBrandOptions(merged);
+    });
+    getDistinctCategories().then((db) => {
+      const merged = [...new Set([...(settings.categoryOptions ?? []), ...db])].sort((a, b) => a.localeCompare(b));
+      setCategoryOptions(merged);
+    });
     getLastUsedBrand().then(setLastBrand);
     getLastUsedCategory().then(setLastCategory);
-  }, [getDistinctBrands, getDistinctCategories, getLastUsedBrand, getLastUsedCategory]);
+    // Load DB distinct values for custom dropdown fields
+    const dropdownFields = (settings.customFields ?? []).filter((f) => f.type === 'dropdown' && f.enabled);
+    Promise.all(
+      dropdownFields.map(async (cf) => {
+        const dbVals = await getDistinctCustomFieldValues(cf.id);
+        return [cf.id, dbVals] as const;
+      }),
+    ).then((entries) => {
+      const map: Record<string, string[]> = {};
+      for (const [id, vals] of entries) map[id] = vals;
+      setCustomFieldOptionsMap(map);
+    });
+  }, [getDistinctBrands, getDistinctCategories, getDistinctCustomFieldValues, getLastUsedBrand, getLastUsedCategory, settings.brandOptions, settings.categoryOptions, settings.customFields]);
 
   const [selectedThumbIdx, setSelectedThumbIdx] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ index: number } | null>(null);
@@ -400,11 +421,18 @@ export function CapturePage() {
     } else {
       await createProduct(state.barcode, state.mrp, state.images, state.qty, state.brand, state.category, state.customData);
     }
-    getDistinctBrands().then(setBrandOptions);
-    getDistinctCategories().then(setCategoryOptions);
+    syncDropdownValues({ brand: state.brand, category: state.category, customData: state.customData });
+    getDistinctBrands().then((db) => {
+      const merged = [...new Set([...(settings.brandOptions ?? []), ...db])].sort((a, b) => a.localeCompare(b));
+      setBrandOptions(merged);
+    });
+    getDistinctCategories().then((db) => {
+      const merged = [...new Set([...(settings.categoryOptions ?? []), ...db])].sort((a, b) => a.localeCompare(b));
+      setCategoryOptions(merged);
+    });
     if (state.brand) setLastBrand(state.brand);
     if (state.category) setLastCategory(state.category);
-  }, [createProduct, replaceAllImages, state, getDistinctBrands, getDistinctCategories]);
+  }, [createProduct, replaceAllImages, state, getDistinctBrands, getDistinctCategories, syncDropdownValues]);
 
   const handleNext = useCallback(async () => {
     await handleSave();
@@ -583,6 +611,7 @@ export function CapturePage() {
               lastCategory={lastCategory}
               fieldOrder={settings.fieldOrder ?? ['mrp', 'qty', 'brand', 'category']}
               customFields={settings.customFields ?? []}
+              customFieldOptionsMap={customFieldOptionsMap}
               onSubmit={handleDetails}
               onAddMorePhotos={handleBackToPhotos}
             />

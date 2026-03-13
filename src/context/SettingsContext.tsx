@@ -29,6 +29,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (!Array.isArray(merged.fieldOrder)) {
           merged.fieldOrder = [...DEFAULT_SETTINGS.fieldOrder];
         }
+        if (!Array.isArray(merged.brandOptions)) {
+          merged.brandOptions = [];
+        }
+        if (!Array.isArray(merged.categoryOptions)) {
+          merged.categoryOptions = [];
+        }
         setSettings(merged);
       }
       setLoading(false);
