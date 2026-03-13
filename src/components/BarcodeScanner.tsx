@@ -4,13 +4,18 @@ import { ManualBarcodeInput } from './ManualBarcodeInput';
 import { MD3Button } from './md3/MD3Button';
 import { Icon } from './md3/Icon';
 
-const SCANNING_TIPS = [
-  'Having trouble? Try holding the product flat and steady.',
-  'Move to a well-lit area, or tap the flash icon.',
-  'Try tilting the product slightly to reduce glare on the barcode.',
+interface ScanTip {
+  text: string;
+  action?: 'flash' | 'manual';
+}
+
+const SCANNING_TIPS: ScanTip[] = [
+  { text: 'Hold the product steady and align the barcode within the box.' },
+  { text: 'Tap the flash icon ⚡ for better visibility.', action: 'flash' },
+  { text: 'Still struggling? Try entering the barcode manually.', action: 'manual' },
 ];
 
-const TIP_THRESHOLDS_S = [5, 10, 15];
+const TIP_THRESHOLDS_S = [8, 18, 30];
 
 interface Props {
   onScan: (barcode: string) => void;
@@ -86,15 +91,17 @@ export function BarcodeScanner({ onScan }: Props) {
       <div className="relative w-full max-w-sm">
         <div
           id="barcode-scanner"
+          data-tour="barcode-scanner"
           className="w-full rounded-[var(--md-shape-md)] overflow-hidden bg-black barcode-guide"
           style={{ minHeight: 250 }}
         />
         {isScanning && torchSupported && (
           <button
+            data-tour="scanner-flash-btn"
             onClick={toggleTorch}
-            className={`absolute top-2 right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-md ${
+            className={`absolute top-2 right-2 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all ${
               torchOn ? 'bg-yellow-400 text-black' : 'bg-black/50 text-white'
-            }`}
+            } ${tipIndex >= 0 && SCANNING_TIPS[tipIndex]?.action === 'flash' ? 'ring-2 ring-yellow-400 animate-pulse' : ''}`}
           >
             <Icon name={torchOn ? 'flash-on' : 'flash-off'} size={20} />
           </button>
@@ -126,16 +133,21 @@ export function BarcodeScanner({ onScan }: Props) {
 
       {tipIndex >= 0 && (
         <div className="w-full max-w-sm text-center text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-[var(--md-shape-sm)] animate-fade-in">
-          {SCANNING_TIPS[tipIndex]}
+          {SCANNING_TIPS[tipIndex].text}
         </div>
       )}
 
       <button
+        data-tour="manual-barcode-btn"
         onClick={() => {
           stop();
           setManual(true);
         }}
-        className="text-sm text-primary font-medium"
+        className={`text-sm text-primary font-medium transition-all ${
+          tipIndex >= 0 && SCANNING_TIPS[tipIndex]?.action === 'manual'
+            ? 'bg-primary-container px-4 py-2 rounded-full animate-pulse shadow-sm'
+            : ''
+        }`}
       >
         Enter barcode manually
       </button>

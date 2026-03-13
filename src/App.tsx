@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { TourProvider } from './context/TourContext';
 import { Layout } from './components/Layout';
+import { TourOverlay } from './components/TourOverlay';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { SetupPage } from './pages/SetupPage';
 import { CapturePage } from './pages/CapturePage';
@@ -41,16 +43,19 @@ function AppRoutes() {
   }
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/capture" element={<CapturePage />} />
-        <Route path="/products" element={<ProductListPage />} />
-        <Route path="/products/:id" element={<ProductDetailPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="*" element={<Navigate to="/capture" replace />} />
-      </Routes>
-    </Layout>
+    <TourProvider>
+      <Layout>
+        <Routes>
+          <Route path="/capture" element={<CapturePage />} />
+          <Route path="/products" element={<ProductListPage />} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/setup" element={<SetupPage />} />
+          <Route path="*" element={<Navigate to="/capture" replace />} />
+        </Routes>
+      </Layout>
+      <TourOverlay />
+    </TourProvider>
   );
 }
 

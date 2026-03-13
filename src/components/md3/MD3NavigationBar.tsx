@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTour } from '../../context/TourContext';
 import { Icon } from './Icon';
 
 const tabs = [
@@ -10,15 +11,27 @@ const tabs = [
 export function MD3NavigationBar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { startTour } = useTour();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-frame safe-area-pb">
+      {/* Floating help button */}
+      <button
+        data-tour="help-btn"
+        onClick={startTour}
+        className="absolute -top-14 right-3 w-11 h-11 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+        title="Help & Guide"
+      >
+        <Icon name="help" size={22} />
+      </button>
       <div className="flex h-16">
         {tabs.map((tab) => {
           const active = location.pathname.startsWith(tab.path);
+          const tourId = tab.path === '/capture' ? 'nav-capture' : tab.path === '/products' ? 'nav-products' : 'nav-settings';
           return (
             <button
               key={tab.path}
+              data-tour={tourId}
               onClick={() => navigate(tab.path)}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors"
             >
