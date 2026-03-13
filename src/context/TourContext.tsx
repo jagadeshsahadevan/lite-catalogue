@@ -11,7 +11,10 @@ export interface TourStep {
   icon?: string;
   interactive?: boolean;
   autoAdvanceMs?: number;
+  disableBack?: boolean;
 }
+
+const SCAN_STEP_IDS = new Set(['scan-barcode', 'flash-control', 'manual-entry', 'type-barcode']);
 
 const CAPTURE_STEPS: TourStep[] = [
   {
@@ -38,7 +41,7 @@ const CAPTURE_STEPS: TourStep[] = [
     page: '/capture',
     target: 'scanner-flash-btn',
     title: 'Use Flash',
-    description: 'Lighting poor? Tap the flash icon for better visibility. Still auto-advancing if not scanned...',
+    description: 'Lighting poor? Tap the flash icon for better visibility.',
     position: 'bottom',
     icon: '⚡',
     interactive: true,
@@ -49,43 +52,38 @@ const CAPTURE_STEPS: TourStep[] = [
     page: '/capture',
     target: 'manual-barcode-btn',
     title: 'Enter Manually',
-    description: 'Tap "Enter barcode manually" to type it. Or wait — a demo barcode will auto-fill so you can continue.',
+    description: 'Tap "Enter barcode manually" below to type the barcode yourself.',
     position: 'top',
     icon: '⌨️',
     interactive: true,
-    autoAdvanceMs: 10000,
   },
   {
-    id: 'take-photos',
+    id: 'type-barcode',
     page: '/capture',
-    title: 'Step 2: Take Photos',
-    description: 'After scanning, the camera opens. Point at the product and tap the big white capture button to photograph it.',
+    target: 'manual-barcode-input',
+    title: 'Type Barcode',
+    description: 'Type a barcode in the input box and tap Go. If you don\'t enter one, a demo barcode will be filled automatically.',
+    position: 'bottom',
+    icon: '⌨️',
+    interactive: true,
+    autoAdvanceMs: 30000,
+    disableBack: true,
+  },
+  {
+    id: 'capture-photos',
+    page: '/capture',
+    title: 'Step 2: Capture Photos',
+    description: 'The camera opens after scanning. Point at the product and tap the big white capture button. Take as many shots as you need, then tap "Done".',
     position: 'center',
     icon: '📸',
   },
   {
-    id: 'done-photos',
+    id: 'add-details',
     page: '/capture',
-    title: 'Done Taking Photos',
-    description: 'Once you have enough photos, tap the "Done" button to proceed. You can always add more later.',
-    position: 'center',
-    icon: '✅',
-  },
-  {
-    id: 'product-details',
-    page: '/capture',
-    title: 'Step 3: Add Details',
-    description: 'Fill in MRP, quantity, brand, category — all on one page. Only fields enabled in Settings will appear.',
+    title: 'Step 3: Add Details & Save',
+    description: 'Fill in MRP, quantity, brand, or category — all on one page. Tap "Continue" to save, or "Skip" to save without details. You can edit later.',
     position: 'center',
     icon: '📝',
-  },
-  {
-    id: 'skip-continue',
-    page: '/capture',
-    title: 'Skip or Continue',
-    description: 'Tap "Continue" to save details, or "Skip" to save without. You can always edit them later from the product page.',
-    position: 'center',
-    icon: '⏭️',
   },
 ];
 
@@ -102,16 +100,8 @@ const PRODUCTS_STEPS: TourStep[] = [
   {
     id: 'select-products',
     page: '/products',
-    title: 'Select Products',
-    description: 'Each product card has a checkbox. Tap it to select one or more products for sharing or deleting.',
-    position: 'center',
-    icon: '☑️',
-  },
-  {
-    id: 'share-products',
-    page: '/products',
-    title: 'Share',
-    description: 'After selecting, tap "Share" to send a single zip file containing all product images and a CSV catalogue.',
+    title: 'Select & Share',
+    description: 'Tap the checkbox on any product card to select it, then tap "Share" to send a zip containing product images and a CSV catalogue.',
     position: 'center',
     icon: '🔗',
   },
@@ -157,6 +147,7 @@ interface TourContextValue {
   acceptFullTour: () => void;
   declineFullTour: () => void;
   registerAutoScan: (cb: (barcode: string) => void) => void;
+  markScanComplete: () => void;
 }
 
 const TourContext = createContext<TourContextValue>({
@@ -174,6 +165,7 @@ const TourContext = createContext<TourContextValue>({
   acceptFullTour: () => {},
   declineFullTour: () => {},
   registerAutoScan: () => {},
+  markScanComplete: () => {},
 });
 
 export function useTour() {
@@ -193,6 +185,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [tourMode, setTourMode] = useState<TourMode>('full');
   const [showFullTourOffer, setShowFullTourOffer] = useState(false);
   const autoScanRef = useRef<((barcode: string) => void) | null>(null);
+  const scanCompleteRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -205,6 +198,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [navigate, location.pathname]);
 
   const startTour = useCallback(() => {
+    scanCompleteRef.current = false;
     setSteps(FULL_TOUR);
     setStepIndex(0);
     setTourMode('full');
@@ -214,6 +208,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const startPageTour = useCallback(() => {
+    scanCompleteRef.current = false;
     const isCapturePage = location.pathname.startsWith('/capture');
     if (isCapturePage) {
       startTour();
@@ -227,11 +222,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
     setActive(true);
   }, [location.pathname, startTour]);
 
+  const markScanComplete = useCallback(() => {
+    scanCompleteRef.current = true;
+  }, []);
+
   const injectAutoScanIfNeeded = useCallback(() => {
+    if (scanCompleteRef.current) return;
     const step = steps[stepIndex];
     if (!step) return;
-    const isScanRelated = step.id === 'scan-barcode' || step.id === 'flash-control' || step.id === 'manual-entry';
-    if (isScanRelated && autoScanRef.current) {
+    if (SCAN_STEP_IDS.has(step.id) && autoScanRef.current) {
       autoScanRef.current(String(Date.now()));
     }
   }, [steps, stepIndex]);
@@ -252,8 +251,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
     const nextS = steps[next];
     const currentS = steps[stepIndex];
-    const isScanRelated = currentS?.id === 'scan-barcode' || currentS?.id === 'flash-control' || currentS?.id === 'manual-entry';
-    const nextIsScanRelated = nextS?.id === 'scan-barcode' || nextS?.id === 'flash-control' || nextS?.id === 'manual-entry';
+    const isScanRelated = SCAN_STEP_IDS.has(currentS?.id ?? '');
+    const nextIsScanRelated = SCAN_STEP_IDS.has(nextS?.id ?? '');
 
     if (isScanRelated && !nextIsScanRelated) {
       injectAutoScanIfNeeded();
@@ -266,17 +265,21 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const prevStep = useCallback(() => {
     const prev = stepIndex - 1;
     if (prev < 0) return;
+    const currentS = steps[stepIndex];
+    if (currentS?.disableBack) return;
     setStepIndex(prev);
     navigateToStep(steps[prev]);
   }, [stepIndex, steps, navigateToStep]);
 
   const skipTour = useCallback(() => {
+    scanCompleteRef.current = false;
     setActive(false);
     setStepIndex(0);
     setShowFullTourOffer(false);
   }, []);
 
   const acceptFullTour = useCallback(() => {
+    scanCompleteRef.current = false;
     setShowFullTourOffer(false);
     setSteps(FULL_TOUR);
     setStepIndex(0);
@@ -315,6 +318,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
       acceptFullTour,
       declineFullTour,
       registerAutoScan,
+      markScanComplete,
     }}>
       {children}
     </TourContext.Provider>

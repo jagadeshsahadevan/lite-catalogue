@@ -30,7 +30,7 @@ export function ManualBarcodeInput({ onSubmit }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-sm mx-auto space-y-3">
+    <form data-tour="manual-barcode-input" onSubmit={handleSubmit} className="w-full max-w-sm mx-auto space-y-3">
       <MD3TextField
         label="Enter barcode number"
         value={value}

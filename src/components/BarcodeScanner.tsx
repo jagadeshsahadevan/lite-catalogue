@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { useTour } from '../context/TourContext';
 import { ManualBarcodeInput } from './ManualBarcodeInput';
 import { MD3Button } from './md3/MD3Button';
 import { Icon } from './md3/Icon';
@@ -23,6 +24,7 @@ interface Props {
 
 export function BarcodeScanner({ onScan }: Props) {
   const [manual, setManual] = useState(false);
+  const { isActive: tourActive, currentStep, nextStep: tourNext, markScanComplete } = useTour();
   const {
     start, stop, isScanning, error,
     torchOn, torchSupported, toggleTorch,
@@ -30,6 +32,14 @@ export function BarcodeScanner({ onScan }: Props) {
   } = useBarcodeScanner(onScan);
   const mountedRef = useRef(false);
   const [tipIndex, setTipIndex] = useState(-1);
+
+  const handleManualSubmit = useCallback((barcode: string) => {
+    onScan(barcode);
+    if (tourActive && currentStep?.id === 'type-barcode') {
+      markScanComplete();
+      tourNext();
+    }
+  }, [onScan, tourActive, currentStep, tourNext, markScanComplete]);
 
   useEffect(() => {
     if (!manual && !mountedRef.current) {
@@ -52,7 +62,7 @@ export function BarcodeScanner({ onScan }: Props) {
   }, [manual, start, stop]);
 
   useEffect(() => {
-    if (!isScanning || !scanStartedAt) {
+    if (!isScanning || !scanStartedAt || tourActive) {
       setTipIndex(-1);
       return;
     }
@@ -65,12 +75,12 @@ export function BarcodeScanner({ onScan }: Props) {
       setTipIndex(idx);
     }, 1000);
     return () => clearInterval(timer);
-  }, [isScanning, scanStartedAt]);
+  }, [isScanning, scanStartedAt, tourActive]);
 
   if (manual) {
     return (
       <div>
-        <ManualBarcodeInput onSubmit={onScan} />
+        <ManualBarcodeInput onSubmit={handleManualSubmit} />
         <button
           onClick={() => setManual(false)}
           className="mt-3 w-full text-sm text-primary font-medium"
@@ -144,6 +154,9 @@ export function BarcodeScanner({ onScan }: Props) {
         onClick={() => {
           stop();
           setManual(true);
+          if (tourActive && currentStep?.id === 'manual-entry') {
+            tourNext();
+          }
         }}
         className={`text-sm text-primary font-medium transition-all ${
           tipIndex >= 0 && SCANNING_TIPS[tipIndex]?.action === 'manual'

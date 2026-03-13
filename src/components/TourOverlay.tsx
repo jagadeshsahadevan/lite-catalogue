@@ -40,6 +40,8 @@ function FullTourOffer() {
   );
 }
 
+const FAST_SKIP_MS = 3000;
+
 export function TourOverlay() {
   const {
     isActive, currentStep, stepIndex, totalSteps,
@@ -48,6 +50,7 @@ export function TourOverlay() {
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [visible, setVisible] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [targetMissing, setTargetMissing] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -61,13 +64,17 @@ export function TourOverlay() {
     if (!isActive || !currentStep) {
       setVisible(false);
       setTargetRect(null);
+      setTargetMissing(false);
       clearTimers();
       return;
     }
 
+    setTargetMissing(false);
+
     const findTarget = () => {
       if (!currentStep.target) {
         setTargetRect(null);
+        setTargetMissing(false);
         setVisible(true);
         return;
       }
@@ -81,22 +88,28 @@ export function TourOverlay() {
           width: rect.width + padding * 2,
           height: rect.height + padding * 2,
         });
+        setTargetMissing(false);
       } else {
         setTargetRect(null);
+        setTargetMissing(true);
       }
       setVisible(true);
     };
 
     const timer = setTimeout(findTarget, 150);
-
     return () => { clearTimeout(timer); };
   }, [isActive, currentStep, stepIndex, clearTimers]);
 
   useEffect(() => {
     clearTimers();
-    if (!isActive || !currentStep?.autoAdvanceMs) return;
+    if (!isActive || !currentStep) return;
 
-    const totalMs = currentStep.autoAdvanceMs;
+    const hasAutoAdvance = !!currentStep.autoAdvanceMs;
+    const shouldFastSkip = targetMissing && currentStep.target && hasAutoAdvance;
+    const totalMs = shouldFastSkip ? FAST_SKIP_MS : (currentStep.autoAdvanceMs ?? 0);
+
+    if (totalMs <= 0) return;
+
     const startTime = Date.now();
     setCountdown(Math.ceil(totalMs / 1000));
 
@@ -114,7 +127,7 @@ export function TourOverlay() {
     }, totalMs);
 
     return clearTimers;
-  }, [isActive, currentStep, stepIndex, nextStep, clearTimers]);
+  }, [isActive, currentStep, stepIndex, nextStep, clearTimers, targetMissing]);
 
   if (showFullTourOffer) return <FullTourOffer />;
   if (!isActive || !currentStep || !visible) return null;
@@ -123,12 +136,13 @@ export function TourOverlay() {
   const isLast = stepIndex === totalSteps - 1;
   const progress = ((stepIndex + 1) / totalSteps) * 100;
   const isInteractive = !!currentStep.interactive;
+  const showBack = !isFirst && !currentStep.disableBack;
 
   const getTooltipStyle = (): React.CSSProperties => {
     if (isInteractive) {
       return {
         position: 'fixed',
-        bottom: '80px',
+        bottom: '90px',
         left: '50%',
         transform: 'translateX(-50%)',
         maxWidth: 'calc(100vw - 24px)',
@@ -175,7 +189,6 @@ export function TourOverlay() {
 
   return (
     <div className="fixed inset-0 z-[100]" style={isInteractive ? { pointerEvents: 'none' } : undefined} onClick={isInteractive ? undefined : skipTour}>
-      {/* Overlay — skip for interactive steps */}
       {!isInteractive && (
         <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
           <defs>
@@ -202,7 +215,6 @@ export function TourOverlay() {
         </svg>
       )}
 
-      {/* Spotlight pulse ring */}
       {targetRect && (
         <div
           className="absolute rounded-xl border-2 border-primary animate-pulse pointer-events-none"
@@ -216,14 +228,12 @@ export function TourOverlay() {
         />
       )}
 
-      {/* Tooltip card */}
       <div
         style={{ ...getTooltipStyle(), pointerEvents: 'auto' }}
         className="w-[min(340px,calc(100vw-24px))] z-[101]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`bg-surface rounded-2xl shadow-2xl overflow-hidden border border-outline-variant/50 ${isInteractive ? 'shadow-[0_0_30px_rgba(0,0,0,0.3)]' : ''}`}>
-          {/* Progress bar */}
           <div className="h-1 bg-surface-container">
             <div
               className="h-full bg-primary transition-all duration-300 rounded-r-full"
@@ -232,7 +242,6 @@ export function TourOverlay() {
           </div>
 
           <div className="px-4 py-3 space-y-2">
-            {/* Header: icon + title + close */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="text-xl flex-shrink-0">{currentStep.icon}</span>
@@ -254,14 +263,14 @@ export function TourOverlay() {
               </div>
             </div>
 
-            {/* Description */}
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              {currentStep.description}
+              {targetMissing && currentStep.id === 'flash-control'
+                ? 'Flash is not available on this device. The tour will continue automatically.'
+                : currentStep.description}
             </p>
 
-            {/* Actions */}
             <div className="flex items-center gap-2">
-              {!isFirst && (
+              {showBack && (
                 <button
                   onClick={prevStep}
                   className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container active:bg-surface-container-high"
