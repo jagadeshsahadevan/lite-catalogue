@@ -202,8 +202,8 @@ export function TourOverlay() {
         </svg>
       )}
 
-      {/* Spotlight pulse ring — non-interactive only */}
-      {!isInteractive && targetRect && (
+      {/* Spotlight pulse ring */}
+      {targetRect && (
         <div
           className="absolute rounded-xl border-2 border-primary animate-pulse pointer-events-none"
           style={{
@@ -211,6 +211,7 @@ export function TourOverlay() {
             left: targetRect.left,
             width: targetRect.width,
             height: targetRect.height,
+            boxShadow: isInteractive ? '0 0 12px 4px rgba(103, 80, 164, 0.5)' : undefined,
           }}
         />
       )}
