@@ -291,7 +291,7 @@ const SUPPRESS_DELETE_WARN_KEY = 'liteCat_suppressDeleteWarn';
 export function CapturePage() {
   const { settings } = useSettings();
   const { createProduct, replaceAllImages, getDuplicateInfo, getDistinctBrands, getDistinctCategories, getLastUsedBrand, getLastUsedCategory } = useProducts();
-  const { registerAutoScan } = useTour();
+  const { registerAutoScan, startTour, isActive: tourActive } = useTour();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -435,7 +435,17 @@ export function CapturePage() {
   );
 
   return (
-    <div className="px-4 pt-2 pb-2 flex flex-col items-center h-full overflow-hidden">
+    <div className="relative px-4 pt-2 pb-2 flex flex-col items-center h-full overflow-hidden">
+      {/* Tour help icon — top right */}
+      {!tourActive && (
+        <button
+          onClick={startTour}
+          className="absolute top-3 right-3 z-10 w-10 h-10 flex items-center justify-center rounded-full text-on-surface"
+          title="Capture guide"
+        >
+          <Icon name="help" size={22} />
+        </button>
+      )}
       {/* Barcode + thumbnail strip — compact top bar */}
       {state.barcode && state.step !== 'scanning' && state.step !== 'duplicate_prompt' && (
         <div className="w-full max-w-sm mb-2 flex items-center gap-2 flex-shrink-0">
