@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { useTour } from '../context/TourContext';
@@ -8,8 +8,9 @@ import { MD3Switch } from '../components/md3/MD3Switch';
 import { MD3TopBar } from '../components/md3/MD3TopBar';
 import { MD3Button } from '../components/md3/MD3Button';
 import { Icon } from '../components/md3/Icon';
-import type { CaptureMode, AppSettings } from '../types';
-import { DEFAULT_SETTINGS, SETTINGS_EXPORT_KEYS } from '../types';
+import { CustomFieldDialog } from '../components/CustomFieldDialog';
+import type { CaptureMode, AppSettings, CustomFieldDef } from '../types';
+import { BUILTIN_FIELD_IDS, DEFAULT_SETTINGS, SETTINGS_EXPORT_KEYS } from '../types';
 
 const modeOptions: { value: CaptureMode; label: string }[] = [
   { value: 'single', label: 'Single Photo' },
@@ -26,7 +27,7 @@ const BUILTIN_META: Record<string, { label: string; desc: string }> = {
 
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings();
-  const { deferredPrompt, isInstalled, isIOS, isAndroid, promptInstall } = useInstallPrompt();
+  const { deferredPrompt, isIOS, isAndroid, promptInstall, dismissInstallPrompt, showInstallSection } = useInstallPrompt();
   const { startSettingsTour, isActive } = useTour();
   const [whyOpen, setWhyOpen] = useState(false);
   const [addToHomeOpen, setAddToHomeOpen] = useState(false);
@@ -34,6 +35,8 @@ export function SettingsPage() {
   const [fieldValue, setFieldValue] = useState('');
   const [importMessage, setImportMessage] = useState<'success' | 'error' | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [customFieldDialog, setCustomFieldDialog] = useState<CustomFieldDef | null | 'add'>(null);
+  const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<CustomFieldDef | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = (field: 'phone' | 'brand') => {
@@ -74,12 +77,67 @@ export function SettingsPage() {
     if (id === 'category') { updateSettings({ askCategory: value }); return; }
   };
 
+  const handleSaveCustomField = useCallback(
+    (data: Omit<CustomFieldDef, 'id'> & { id?: string }) => {
+      const customFields = settings.customFields ?? [];
+      const order = settings.fieldOrder ?? [...BUILTIN_FIELD_IDS];
+      if (data.id) {
+        const next = customFields.map((f) =>
+          f.id === data.id ? { ...f, ...data, id: f.id } : f
+        );
+        updateSettings({ customFields: next });
+      } else {
+        const id = `custom-${Date.now()}`;
+        const next = [...customFields, { ...data, id }];
+        updateSettings({ customFields: next, fieldOrder: [...order, id] });
+      }
+      setCustomFieldDialog(null);
+    },
+    [settings.customFields, settings.fieldOrder, updateSettings]
+  );
+
+  const handleDeleteCustomField = useCallback(() => {
+    if (!deleteFieldConfirm) return;
+    const id = deleteFieldConfirm.id;
+    const fields = (settings.customFields ?? []).filter((f) => f.id !== id);
+    const order = (settings.fieldOrder ?? []).filter((f) => f !== id);
+    updateSettings({ customFields: fields, fieldOrder: order });
+    setDeleteFieldConfirm(null);
+  }, [deleteFieldConfirm, settings.customFields, settings.fieldOrder, updateSettings]);
+
+  const getFullFieldOrder = useCallback(() => {
+    const order = settings.fieldOrder ?? [...BUILTIN_FIELD_IDS];
+    const customIds = (settings.customFields ?? []).map((f) => f.id);
+    const a = [...order];
+    for (const id of customIds) {
+      if (!a.includes(id)) a.push(id);
+    }
+    return a;
+  }, [settings.fieldOrder, settings.customFields]);
+
+  const moveField = useCallback(
+    (fieldId: string, dir: 'up' | 'down') => {
+      const order = getFullFieldOrder().filter((id) => {
+        const isBuiltin = BUILTIN_FIELD_IDS.includes(id as (typeof BUILTIN_FIELD_IDS)[number]);
+        return isBuiltin || (settings.customFields ?? []).some((f) => f.id === id);
+      });
+      const i = order.indexOf(fieldId);
+      if (i < 0) return;
+      const j = dir === 'up' ? i - 1 : i + 1;
+      if (j < 0 || j >= order.length) return;
+      [order[i], order[j]] = [order[j], order[i]];
+      updateSettings({ fieldOrder: order });
+    },
+    [getFullFieldOrder, settings.customFields, updateSettings]
+  );
+
   const exportSettings = () => {
     const toExport: Record<string, unknown> = {};
     for (const key of SETTINGS_EXPORT_KEYS) {
       const val = settings[key];
       if (val !== undefined) toExport[key] = val;
     }
+    // customFields includes options (enum choices for dropdowns) — full structure is preserved
     const blob = new Blob([JSON.stringify(toExport, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -131,8 +189,19 @@ export function SettingsPage() {
         const { id: _id, ...rest } = parsed;
         const toApply: Partial<AppSettings> = {};
         for (const key of SETTINGS_EXPORT_KEYS) {
-          const val = (rest as Record<string, unknown>)[key];
-          if (val !== undefined) (toApply as Record<string, unknown>)[key] = val;
+          let val = (rest as Record<string, unknown>)[key];
+          if (val !== undefined) {
+            if (key === 'customFields' && Array.isArray(val)) {
+              val = val.map((cf: unknown) => {
+                const c = cf as Record<string, unknown>;
+                if (c.type === 'dropdown' && (!Array.isArray(c.options) || c.options === undefined)) {
+                  return { ...c, options: c.options ?? [] };
+                }
+                return c;
+              });
+            }
+            (toApply as Record<string, unknown>)[key] = val;
+          }
         }
         updateSettings(toApply);
         setImportMessage('success');
@@ -260,27 +329,92 @@ export function SettingsPage() {
         <section className="space-y-3" data-tour="tour-settings-field-order">
           <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Product Fields</p>
           <p className="text-[10px] text-on-surface-variant -mt-1">
-            Enable these fields to collect during capture.
+            Enable fields to collect during capture. Reorder with arrows.
           </p>
 
           <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
-            {builtinFieldOrder.map((fid) => {
-              const label = BUILTIN_META[fid]?.label ?? fid;
-              const enabled = getFieldEnabled(fid);
+            {getFullFieldOrder()
+            .filter((fieldId) => {
+              const isBuiltin = builtinFieldOrder.includes(fieldId as typeof builtinFieldOrder[number]);
+              if (isBuiltin) return true;
+              return (settings.customFields ?? []).some((f) => f.id === fieldId);
+            })
+            .map((fieldId, idx) => {
+            const isBuiltin = builtinFieldOrder.includes(fieldId as typeof builtinFieldOrder[number]);
+            const cf = !isBuiltin ? (settings.customFields ?? []).find((f) => f.id === fieldId) : null;
+            const label = isBuiltin ? (BUILTIN_META[fieldId]?.label ?? fieldId) : (cf?.name ?? fieldId);
+            const enabled = isBuiltin ? getFieldEnabled(fieldId) : (cf?.enabled ?? false);
+            const allOrder = getFullFieldOrder();
+            const canMoveUp = idx > 0;
+            const canMoveDown = idx < allOrder.length - 1;
+
+              const toggleCustomEnabled = (v: boolean) => {
+                const next = (settings.customFields ?? []).map((f) =>
+                  f.id === fieldId ? { ...f, enabled: v } : f
+                );
+                updateSettings({ customFields: next });
+              };
+
               return (
-                <div key={fid} className="flex items-center gap-2 px-4 py-2.5">
+                <div key={fieldId} className="flex items-center gap-2 px-4 py-2.5">
+                  <div className="flex items-center gap-1 text-on-surface-variant">
+                    <button
+                      onClick={() => moveField(fieldId, 'up')}
+                      disabled={!canMoveUp}
+                      className="p-1 disabled:opacity-30"
+                      aria-label="Move up"
+                    >
+                      <Icon name="arrow-up" size={18} />
+                    </button>
+                    <button
+                      onClick={() => moveField(fieldId, 'down')}
+                      disabled={!canMoveDown}
+                      className="p-1 disabled:opacity-30"
+                      aria-label="Move down"
+                    >
+                      <Icon name="arrow-down" size={18} />
+                    </button>
+                  </div>
                   <div className="flex-1 min-w-0">
                     <label className="text-sm font-medium text-on-surface">{label}</label>
-                    <p className="text-[10px] text-on-surface-variant">{BUILTIN_META[fid]?.desc}</p>
+                    {isBuiltin && (
+                      <p className="text-[10px] text-on-surface-variant">{BUILTIN_META[fieldId]?.desc}</p>
+                    )}
                   </div>
-                  <MD3Switch
-                    checked={enabled}
-                    onChange={(v) => toggleFieldEnabled(fid, v)}
-                  />
+                  {isBuiltin ? (
+                    <MD3Switch checked={enabled} onChange={(v) => toggleFieldEnabled(fieldId, v)} />
+                  ) : cf ? (
+                    <div className="flex items-center gap-1">
+                      <MD3Switch checked={enabled} onChange={toggleCustomEnabled} />
+                      <button
+                        onClick={() => setCustomFieldDialog(cf)}
+                        className="p-1.5 text-on-surface-variant hover:text-on-surface"
+                        aria-label="Edit"
+                      >
+                        <Icon name="edit" size={18} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteFieldConfirm(cf)}
+                        className="p-1.5 text-on-surface-variant hover:text-error"
+                        aria-label="Delete"
+                      >
+                        <Icon name="delete" size={18} />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
           </MD3Card>
+
+          <button
+            onClick={() => setCustomFieldDialog('add')}
+            className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-outline-variant rounded-[var(--md-shape-sm)] text-sm text-primary font-medium hover:bg-surface-container-low transition-colors"
+            data-tour="tour-settings-add-field"
+          >
+            <Icon name="add" size={20} />
+            Add Field
+          </button>
 
           {settings.askMrp && (
             <MD3Card variant="outlined">
@@ -354,11 +488,20 @@ export function SettingsPage() {
           </MD3Card>
         </section>
 
-        {/* Add to Home Screen */}
-        {!isInstalled && (deferredPrompt || isIOS || isAndroid) && (
+        {/* Add to Home Screen — visibility is browser+device specific (Safari/iOS, Chrome/Android, etc.) */}
+        {showInstallSection && (
           <section className="space-y-2">
             <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">App</p>
             <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-xs text-on-surface-variant">Save to Home Screen</span>
+                <button
+                  onClick={dismissInstallPrompt}
+                  className="text-xs text-on-surface-variant hover:text-on-surface"
+                >
+                  Don&apos;t show again
+                </button>
+              </div>
               {deferredPrompt ? (
                 <button
                   onClick={() => promptInstall()}
@@ -481,6 +624,33 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Add/Edit custom field dialog */}
+      {customFieldDialog && (
+        <CustomFieldDialog
+          field={customFieldDialog === 'add' ? null : customFieldDialog}
+          onSave={handleSaveCustomField}
+          onClose={() => setCustomFieldDialog(null)}
+        />
+      )}
+
+      {/* Delete custom field confirmation */}
+      {deleteFieldConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDeleteFieldConfirm(null)}>
+          <div className="bg-surface rounded-[var(--md-shape-lg)] p-6 max-w-sm w-full shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <Icon name="warning" size={24} className="text-error flex-shrink-0" />
+              <h3 className="text-lg font-medium text-on-surface">Delete field?</h3>
+            </div>
+            <p className="text-sm text-on-surface-variant">
+              Remove &quot;{deleteFieldConfirm.name}&quot;? Existing product data for this field will be kept but the field will no longer appear during capture.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <MD3Button variant="text" onClick={() => setDeleteFieldConfirm(null)}>Cancel</MD3Button>
+              <MD3Button variant="filled" onClick={handleDeleteCustomField} className="!bg-error !text-on-error">Delete</MD3Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

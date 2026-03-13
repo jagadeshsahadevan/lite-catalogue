@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getInstallState, setInstallDismissed, setInstallAccepted } from '../utils/installStorage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -10,13 +11,26 @@ export function useInstallPrompt() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [userDismissed, setUserDismissed] = useState(false);
 
   useEffect(() => {
+    // Check browser+device-specific persisted state
+    const stored = getInstallState();
+    if (stored === 'dismissed') {
+      setUserDismissed(true);
+      return;
+    }
+    if (stored === 'accepted') {
+      setIsInstalled(true);
+      return;
+    }
+
     // Detect if already installed (standalone)
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || (navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (standalone) {
       setIsInstalled(true);
+      setInstallAccepted();
       return;
     }
 
@@ -38,17 +52,25 @@ export function useInstallPrompt() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const promptInstall = async (): Promise<boolean> => {
+  const promptInstall = useCallback(async (): Promise<boolean> => {
     if (!deferredPrompt) return false;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setDeferredPrompt(null);
       setIsInstalled(true);
+      setInstallAccepted();
       return true;
     }
     return false;
-  };
+  }, [deferredPrompt]);
 
-  return { deferredPrompt, isInstalled, isIOS, isAndroid, promptInstall };
+  const dismissInstallPrompt = useCallback(() => {
+    setUserDismissed(true);
+    setInstallDismissed();
+  }, []);
+
+  const showInstallSection = !isInstalled && !userDismissed && (deferredPrompt || isIOS || isAndroid);
+
+  return { deferredPrompt, isInstalled, isIOS, isAndroid, promptInstall, dismissInstallPrompt, showInstallSection };
 }
