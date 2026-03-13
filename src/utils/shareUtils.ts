@@ -144,6 +144,8 @@ function downloadBlob(blob: Blob, filename: string) {
 /**
  * Share products as a single zip (images + CSV inside).
  * Tries native share first, falls back to download.
+ * On Android, canShare() can return false for zip files even when share works,
+ * so we try share directly and fall back to download on failure.
  */
 export async function shareProducts(
   productIds: number[],
@@ -155,16 +157,22 @@ export async function shareProducts(
     const filename = `catalogue-${dateStr}.zip`;
     const zipFile = new File([zipBlob], filename, { type: 'application/zip' });
 
-    if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function') {
+    if (typeof navigator.share === 'function') {
       try {
-        if (navigator.canShare({ files: [zipFile] })) {
-          await navigator.share({ files: [zipFile], title: `Product Catalogue - ${dateStr}` });
-          return { success: true };
-        }
+        const shareData: ShareData = {
+          files: [zipFile],
+          title: `Product Catalogue - ${dateStr}`,
+          text: 'Product catalogue export with images and CSV',
+        };
+        // Don't gate on canShare - it can return false on Android for zip files
+        // even when share works. Try share directly, fall back to download on failure.
+        await navigator.share(shareData);
+        return { success: true };
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           return { success: false, error: 'Share cancelled' };
         }
+        // Share failed (e.g. not supported, user denied) - fall through to download
       }
     }
 

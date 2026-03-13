@@ -225,6 +225,16 @@ export function useProducts() {
     return '';
   }, []);
 
+  const getDistinctCustomFieldValues = useCallback(async (fieldId: string): Promise<string[]> => {
+    const all = await db.products.toArray();
+    const set = new Set<string>();
+    for (const p of all) {
+      const val = p.customData?.[fieldId];
+      if (val && val.trim()) set.add(val.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, []);
+
   return {
     createProduct,
     addMoreImages,
@@ -245,6 +255,7 @@ export function useProducts() {
     getImageCount,
     getDistinctBrands,
     getDistinctCategories,
+    getDistinctCustomFieldValues,
     getLastUsedBrand,
     getLastUsedCategory,
   };

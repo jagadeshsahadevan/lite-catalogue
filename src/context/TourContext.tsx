@@ -119,6 +119,110 @@ const SETTINGS_STEPS: TourStep[] = [
   },
 ];
 
+/** Dedicated Settings page tour — initiated only from Settings page */
+const SETTINGS_PAGE_TOUR: TourStep[] = [
+  {
+    id: 'settings-welcome',
+    page: '/settings',
+    title: 'Settings Guide',
+    description: 'Configure your capture workflow, custom fields, and more. Let\'s walk through the key options.',
+    position: 'center',
+    icon: '⚙️',
+  },
+  {
+    id: 'settings-profile',
+    page: '/settings',
+    target: 'tour-settings-profile',
+    title: 'Profile',
+    description: 'Add your mobile number and brand/store name. These appear in exports and help identify your catalogue.',
+    position: 'bottom',
+    icon: '👤',
+  },
+  {
+    id: 'settings-capture-mode',
+    page: '/settings',
+    target: 'tour-settings-capture-mode',
+    title: 'Capture Mode',
+    description: 'Choose how many photos per product: Single, Front & Back, or Front, Back & More with position tags.',
+    position: 'bottom',
+    icon: '📷',
+  },
+  {
+    id: 'settings-custom-fields',
+    page: '/settings',
+    target: 'tour-settings-custom-fields',
+    title: 'Add Custom Fields',
+    description: 'Tap "Add Custom Field" to create fields like Color, Size, or SKU. Enter a name, choose type: Text, Date, or Dropdown. For dropdown, add comma-separated options (e.g. Red, Blue, Green).',
+    position: 'bottom',
+    icon: '📝',
+  },
+  {
+    id: 'settings-field-order',
+    page: '/settings',
+    target: 'tour-settings-field-order',
+    title: 'Enable & Reorder Fields',
+    description: 'Use the arrows to reorder fields. Toggle each field on or off — enabled fields appear during capture in this order. Edit or delete custom fields with the icons.',
+    position: 'bottom',
+    icon: '📋',
+  },
+  {
+    id: 'settings-backup',
+    page: '/settings',
+    target: 'tour-settings-backup',
+    title: 'Backup & Restore',
+    description: 'Download settings to a file or load from a saved file. Easy to share or restore on a new device.',
+    position: 'bottom',
+    icon: '💾',
+  },
+  {
+    id: 'settings-done',
+    page: '/settings',
+    title: 'You\'re All Set',
+    description: 'Tap the help icon anytime to revisit this guide. Start capturing to build your catalogue.',
+    position: 'center',
+    icon: '✅',
+  },
+];
+
+/** Product page tour — when page has at least one product */
+const PRODUCTS_PAGE_TOUR: TourStep[] = [
+  {
+    id: 'products-header',
+    page: '/products',
+    target: 'tour-products-header',
+    title: 'Products',
+    description: 'All your captured products appear here, sorted by most recent.',
+    position: 'bottom',
+    icon: '📦',
+  },
+  {
+    id: 'products-card-editable',
+    page: '/products',
+    target: 'tour-products-card',
+    title: 'Product Card — Tap to Edit',
+    description: 'Each card shows barcode, MRP, qty, and custom fields. Tap a card to open product details. There you can edit MRP, Qty, Brand, Category, custom fields, and photo position tags — tap the edit icon next to any field.',
+    position: 'top',
+    icon: '✏️',
+  },
+  {
+    id: 'products-search-filter',
+    page: '/products',
+    target: 'tour-products-search',
+    title: 'Search & Filter',
+    description: 'Search by barcode or filter by date. Tap the icons to toggle search and date filters.',
+    position: 'bottom',
+    icon: '🔍',
+  },
+  {
+    id: 'products-select-share',
+    page: '/products',
+    title: 'Select & Share',
+    description: 'Tap the checkbox on any product card to select it, then tap "Share" to send a zip with images and CSV.',
+    position: 'center',
+    icon: '🔗',
+  },
+];
+
 const FINISH_STEP: TourStep = {
   id: 'finish',
   page: '/capture',
@@ -130,7 +234,7 @@ const FINISH_STEP: TourStep = {
 
 const FULL_TOUR = [...CAPTURE_STEPS, ...PRODUCTS_STEPS, ...SETTINGS_STEPS, FINISH_STEP];
 
-type TourMode = 'full' | 'page';
+type TourMode = 'full' | 'page' | 'settings' | 'products';
 
 interface TourContextValue {
   isActive: boolean;
@@ -141,12 +245,15 @@ interface TourContextValue {
   showFullTourOffer: boolean;
   startTour: () => void;
   startPageTour: () => void;
+  startSettingsTour: () => void;
+  startProductsTour: (hasProducts: boolean) => void;
   nextStep: () => void;
   prevStep: () => void;
   skipTour: () => void;
   acceptFullTour: () => void;
   declineFullTour: () => void;
   registerAutoScan: (cb: (barcode: string) => void) => void;
+  registerProductsCount: (count: number) => void;
   markScanComplete: () => void;
 }
 
@@ -159,23 +266,20 @@ const TourContext = createContext<TourContextValue>({
   showFullTourOffer: false,
   startTour: () => {},
   startPageTour: () => {},
+  startSettingsTour: () => {},
+  startProductsTour: () => {},
   nextStep: () => {},
   prevStep: () => {},
   skipTour: () => {},
   acceptFullTour: () => {},
   declineFullTour: () => {},
   registerAutoScan: () => {},
+  registerProductsCount: () => {},
   markScanComplete: () => {},
 });
 
 export function useTour() {
   return useContext(TourContext);
-}
-
-function getPageSteps(pathname: string): TourStep[] {
-  if (pathname.startsWith('/products')) return PRODUCTS_STEPS;
-  if (pathname.startsWith('/settings')) return SETTINGS_STEPS;
-  return CAPTURE_STEPS;
 }
 
 export function TourProvider({ children }: { children: ReactNode }) {
@@ -186,6 +290,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [showFullTourOffer, setShowFullTourOffer] = useState(false);
   const autoScanRef = useRef<((barcode: string) => void) | null>(null);
   const scanCompleteRef = useRef(false);
+  const productsCountRef = useRef(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -207,20 +312,52 @@ export function TourProvider({ children }: { children: ReactNode }) {
     navigate('/capture');
   }, [navigate]);
 
-  const startPageTour = useCallback(() => {
+  const startSettingsTour = useCallback(() => {
     scanCompleteRef.current = false;
-    const isCapturePage = location.pathname.startsWith('/capture');
-    if (isCapturePage) {
+    setSteps(SETTINGS_PAGE_TOUR);
+    setStepIndex(0);
+    setTourMode('settings');
+    setShowFullTourOffer(false);
+    setActive(true);
+    if (!location.pathname.startsWith('/settings')) {
+      navigate('/settings');
+    }
+  }, [navigate, location.pathname]);
+
+  const startProductsTour = useCallback((hasProducts: boolean) => {
+    scanCompleteRef.current = false;
+    if (hasProducts) {
+      setSteps(PRODUCTS_PAGE_TOUR);
+      setStepIndex(0);
+      setTourMode('products');
+      setShowFullTourOffer(false);
+      setActive(true);
+      if (!location.pathname.startsWith('/products')) {
+        navigate('/products');
+      }
+    } else {
+      startTour();
+    }
+  }, [navigate, location.pathname, startTour]);
+
+  const startPageTour = useCallback(() => {
+    if (location.pathname.startsWith('/capture')) {
       startTour();
       return;
     }
-    const pageSteps = getPageSteps(location.pathname);
-    setSteps(pageSteps);
-    setStepIndex(0);
-    setTourMode('page');
-    setShowFullTourOffer(false);
-    setActive(true);
-  }, [location.pathname, startTour]);
+    if (location.pathname.startsWith('/settings')) {
+      startSettingsTour();
+      return;
+    }
+    if (location.pathname.startsWith('/products')) {
+      startProductsTour(productsCountRef.current > 0);
+      return;
+    }
+  }, [location.pathname, startTour, startSettingsTour, startProductsTour]);
+
+  const registerProductsCount = useCallback((count: number) => {
+    productsCountRef.current = count;
+  }, []);
 
   const markScanComplete = useCallback(() => {
     scanCompleteRef.current = true;
@@ -238,7 +375,12 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const nextStep = useCallback(() => {
     const next = stepIndex + 1;
     if (next >= steps.length) {
-      if (tourMode === 'page') {
+      if (tourMode === 'settings') {
+        setActive(false);
+        setShowFullTourOffer(false);
+        return;
+      }
+      if (tourMode === 'products' || tourMode === 'page') {
         setActive(false);
         setShowFullTourOffer(true);
         return;
@@ -312,12 +454,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
       showFullTourOffer,
       startTour,
       startPageTour,
+      startSettingsTour,
+      startProductsTour,
       nextStep,
       prevStep,
       skipTour,
       acceptFullTour,
       declineFullTour,
       registerAutoScan,
+      registerProductsCount,
       markScanComplete,
     }}>
       {children}

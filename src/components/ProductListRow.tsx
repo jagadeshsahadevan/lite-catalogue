@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Product } from '../types';
 import { useProducts } from '../hooks/useProducts';
+import { useSettings } from '../context/SettingsContext';
 import { blobToObjectUrl, revokeObjectUrl } from '../utils/imageUtils';
 import { Icon } from './md3/Icon';
 
@@ -13,7 +14,14 @@ interface Props {
 
 export function ProductListRow({ product, onClick, onToggleSelect, selected = false }: Props) {
   const { getFirstImage } = useProducts();
+  const { settings } = useSettings();
   const [thumbUrl, setThumbUrl] = useState('');
+
+  const customFields = settings.customFields ?? [];
+  const customData = product.customData ?? {};
+  const customDisplay = customFields
+    .filter((cf) => customData[cf.id])
+    .map((cf) => ({ name: cf.name, value: customData[cf.id]! }));
 
   useEffect(() => {
     let url = '';
@@ -37,6 +45,7 @@ export function ProductListRow({ product, onClick, onToggleSelect, selected = fa
 
   return (
     <div
+      data-tour="tour-products-card"
       className={`
         bg-surface rounded-[var(--md-shape-sm)] border overflow-hidden w-full transition-all
         flex items-center gap-3 p-2 text-left
@@ -78,11 +87,16 @@ export function ProductListRow({ product, onClick, onToggleSelect, selected = fa
               <span className="text-xs font-semibold text-on-surface">₹{product.mrp}</span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-xs text-on-surface-variant">{formatDate(product.capturedAt)}</span>
             <span className="text-xs text-on-surface-variant">
               Qty: {product.qty != null ? product.qty : 0}
             </span>
+            {customDisplay.slice(0, 2).map(({ name, value }) => (
+              <span key={name} className="text-[10px] text-on-surface-variant truncate max-w-[70px]" title={`${name}: ${value}`}>
+                {name}: {value}
+              </span>
+            ))}
           </div>
         </div>
 

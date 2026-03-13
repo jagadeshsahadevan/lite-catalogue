@@ -72,7 +72,7 @@ export interface DuplicateInfo {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  captureMode: 'single',
+  captureMode: 'front-back-more',
   askMrp: true,
   askQty: false,
   askBrand: false,

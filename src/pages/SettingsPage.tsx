@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { useInstallPrompt } from '../hooks/useInstallPrompt';
+import { useTour } from '../context/TourContext';
 
 import { MD3Card } from '../components/md3/MD3Card';
 import { MD3Switch } from '../components/md3/MD3Switch';
 import { MD3TopBar } from '../components/md3/MD3TopBar';
 import { MD3Button } from '../components/md3/MD3Button';
 import { Icon } from '../components/md3/Icon';
-import type { CaptureMode, CustomFieldDef, CustomFieldType } from '../types';
+import type { CaptureMode, CustomFieldDef, CustomFieldType, AppSettings } from '../types';
 import { BUILTIN_FIELD_IDS } from '../types';
 
 const modeOptions: { value: CaptureMode; label: string }[] = [
@@ -34,7 +36,10 @@ function generateId() {
 
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings();
+  const { deferredPrompt, isInstalled, isIOS, isAndroid, promptInstall } = useInstallPrompt();
+  const { startSettingsTour, isActive } = useTour();
   const [whyOpen, setWhyOpen] = useState(false);
+  const [addToHomeOpen, setAddToHomeOpen] = useState(false);
   const [editingField, setEditingField] = useState<'phone' | 'brand' | null>(null);
   const [fieldValue, setFieldValue] = useState('');
 
@@ -45,6 +50,8 @@ export function SettingsPage() {
   const [cfType, setCfType] = useState<CustomFieldType>('text');
   const [cfOptions, setCfOptions] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<'success' | 'error' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = (field: 'phone' | 'brand') => {
     setFieldValue(field === 'phone' ? settings.phoneNumber : settings.brandName);
@@ -147,13 +154,69 @@ export function SettingsPage() {
     setDeleteConfirmId(null);
   };
 
+  const exportSettings = () => {
+    const { id: _id, ...toExport } = settings;
+    const blob = new Blob([JSON.stringify(toExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lite-catalogue-settings-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const isValidSettings = (obj: unknown): obj is Partial<AppSettings> => {
+    if (!obj || typeof obj !== 'object') return false;
+    const o = obj as Record<string, unknown>;
+    return (
+      typeof o.captureMode === 'string' &&
+      ['single', 'front-back', 'front-back-more'].includes(o.captureMode)
+    );
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    setImportMessage(null);
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string) as Partial<AppSettings>;
+        if (!isValidSettings(parsed)) {
+          setImportMessage('error');
+          return;
+        }
+        const { id: _id, ...rest } = parsed;
+        updateSettings(rest);
+        setImportMessage('success');
+      } catch {
+        setImportMessage('error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div>
-      <MD3TopBar title="Settings" />
+      <MD3TopBar
+        title="Settings"
+        trailing={
+          !isActive && (
+            <button
+              onClick={startSettingsTour}
+              className="w-10 h-10 flex items-center justify-center rounded-full text-on-frame"
+              title="Settings guide"
+            >
+              <Icon name="help" size={22} />
+            </button>
+          )
+        }
+      />
 
       <div className="p-4 space-y-6 max-w-sm mx-auto">
         {/* Profile */}
-        <section className="space-y-2">
+        <section className="space-y-2" data-tour="tour-settings-profile">
           <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Profile</p>
           <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
             <div className="px-4 py-3">
@@ -220,7 +283,7 @@ export function SettingsPage() {
         </section>
 
         {/* Capture Mode */}
-        <section className="space-y-2">
+        <section className="space-y-2" data-tour="tour-settings-capture-mode">
           <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Capture Mode</p>
           <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
             {modeOptions.map((opt) => (
@@ -238,10 +301,27 @@ export function SettingsPage() {
           </MD3Card>
         </section>
 
+        {/* Custom Fields — prominent add section */}
+        <section className="space-y-2" data-tour="tour-settings-custom-fields">
+          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Custom Fields</p>
+          <p className="text-xs text-on-surface-variant">
+            Add your own fields (e.g. Color, Size, SKU) to collect during capture. Choose text, date, or dropdown type.
+          </p>
+          <MD3Card variant="outlined" className="p-4">
+            <button
+              onClick={openAddField}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full border-2 border-dashed border-primary text-primary font-medium text-sm active:bg-primary-container/20"
+            >
+              <Icon name="add" size={20} className="text-primary" />
+              Add Custom Field
+            </button>
+          </MD3Card>
+        </section>
+
         {/* Product Fields — unified ordered list */}
-        <section className="space-y-3">
+        <section className="space-y-3" data-tour="tour-settings-field-order">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Product Fields</p>
+            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Field Order</p>
             <button
               onClick={openAddField}
               className="flex items-center gap-1 text-xs font-medium text-primary active:opacity-70"
@@ -365,6 +445,107 @@ export function SettingsPage() {
           </MD3Card>
         </section>
 
+        {/* Export / Import */}
+        <section className="space-y-2" data-tour="tour-settings-backup">
+          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Backup &amp; Restore</p>
+          <p className="text-xs text-on-surface-variant">
+            Download settings to share or restore on a new device.
+          </p>
+          <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
+            <button
+              onClick={exportSettings}
+              className="w-full flex items-center justify-between px-4 py-3 text-left"
+            >
+              <span className="text-sm text-on-surface">Download settings</span>
+              <Icon name="download" size={20} className="text-on-surface-variant" />
+            </button>
+            <div className="px-4 py-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={handleImportFile}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <span className="text-sm text-on-surface">Load from file</span>
+                <Icon name="cloud_upload" size={20} className="text-on-surface-variant" />
+              </button>
+              {importMessage === 'success' && (
+                <p className="text-xs text-primary mt-2">Settings loaded successfully.</p>
+              )}
+              {importMessage === 'error' && (
+                <p className="text-xs text-error mt-2">Invalid file. Use a settings file exported from this app.</p>
+              )}
+            </div>
+          </MD3Card>
+        </section>
+
+        {/* Add to Home Screen */}
+        {!isInstalled && (deferredPrompt || isIOS || isAndroid) && (
+          <section className="space-y-2">
+            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">App</p>
+            <MD3Card variant="outlined" className="p-0 divide-y divide-outline-variant">
+              {deferredPrompt ? (
+                <button
+                  onClick={() => promptInstall()}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                >
+                  <span className="text-sm text-on-surface">Save to Home Screen</span>
+                  <Icon name="add" size={20} className="text-primary" />
+                </button>
+              ) : isIOS ? (
+                <>
+                  <button
+                    onClick={() => setAddToHomeOpen(!addToHomeOpen)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  >
+                    <span className="text-sm text-on-surface">Save to Home Screen</span>
+                    <Icon name={addToHomeOpen ? 'expand-less' : 'expand-more'} size={20} className="text-on-surface-variant" />
+                  </button>
+                  {addToHomeOpen && (
+                    <div className="px-4 py-3 text-left space-y-2">
+                      <p className="text-xs text-on-surface-variant">
+                        In Safari, tap the Share button <Icon name="share" size={14} className="inline align-middle" /> at the bottom, then scroll and tap &quot;Add to Home Screen&quot;.
+                      </p>
+                      <ol className="text-xs text-on-surface-variant list-decimal list-inside space-y-1">
+                        <li>Tap Share (square with arrow)</li>
+                        <li>Scroll down and tap &quot;Add to Home Screen&quot;</li>
+                        <li>Tap &quot;Add&quot;</li>
+                      </ol>
+                    </div>
+                  )}
+                </>
+              ) : isAndroid ? (
+                <>
+                  <button
+                    onClick={() => setAddToHomeOpen(!addToHomeOpen)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  >
+                    <span className="text-sm text-on-surface">Save to Home Screen</span>
+                    <Icon name={addToHomeOpen ? 'expand-less' : 'expand-more'} size={20} className="text-on-surface-variant" />
+                  </button>
+                  {addToHomeOpen && (
+                    <div className="px-4 py-3 text-left space-y-2">
+                      <p className="text-xs text-on-surface-variant">
+                        In Chrome, tap the menu (⋮) in the top right, then tap &quot;Add to Home screen&quot; or &quot;Install app&quot;.
+                      </p>
+                      <ol className="text-xs text-on-surface-variant list-decimal list-inside space-y-1">
+                        <li>Tap the three-dot menu</li>
+                        <li>Tap &quot;Add to Home screen&quot; or &quot;Install app&quot;</li>
+                        <li>Tap &quot;Add&quot; or &quot;Install&quot;</li>
+                      </ol>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </MD3Card>
+          </section>
+        )}
+
         {/* About */}
         <section className="text-center space-y-3 pt-4">
           <p className="text-xs text-on-surface-variant">
@@ -387,7 +568,7 @@ export function SettingsPage() {
             className="inline-flex items-center gap-1 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <Icon name={whyOpen ? 'expand-less' : 'expand-more'} size={16} />
-            Why I made this
+            Why I made this?
           </button>
 
           {whyOpen && (

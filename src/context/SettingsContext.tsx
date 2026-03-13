@@ -22,6 +22,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (merged.setupComplete && merged.onboardingComplete === undefined) {
           merged.onboardingComplete = true;
         }
+        // Ensure customFields and fieldOrder exist (migration for older DB)
+        if (!Array.isArray(merged.customFields)) {
+          merged.customFields = DEFAULT_SETTINGS.customFields;
+        }
+        if (!Array.isArray(merged.fieldOrder)) {
+          merged.fieldOrder = [...DEFAULT_SETTINGS.fieldOrder];
+        }
         setSettings(merged);
       }
       setLoading(false);

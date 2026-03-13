@@ -4,6 +4,7 @@ import { useProducts } from '../hooks/useProducts';
 import { useSettings } from '../context/SettingsContext';
 import { PhotoPreview } from '../components/PhotoPreview';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
+import { InlineComboField } from '../components/InlineComboField';
 import { MD3TopBar } from '../components/md3/MD3TopBar';
 import { MD3Button } from '../components/md3/MD3Button';
 import { MD3Chip } from '../components/md3/MD3Chip';
@@ -14,7 +15,7 @@ import type { Product, ProductImage } from '../types';
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty, updateProductBrand, updateProductCategory, updateProductCustomData } = useProducts();
+  const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty, updateProductBrand, updateProductCategory, updateProductCustomData, getDistinctBrands, getDistinctCategories, getDistinctCustomFieldValues } = useProducts();
   const { settings } = useSettings();
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -41,6 +42,11 @@ export function ProductDetailPage() {
   const [editingCustomFieldId, setEditingCustomFieldId] = useState<string | null>(null);
   const [customFieldValue, setCustomFieldValue] = useState('');
 
+  // Dropdown options for Brand, Category, and custom dropdown fields
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [customFieldOptionsMap, setCustomFieldOptionsMap] = useState<Record<string, string[]>>({});
+
   // Delete confirmation state
   const [showDeleteProduct, setShowDeleteProduct] = useState(false);
   const [pendingDeleteImageId, setPendingDeleteImageId] = useState<number | null>(null);
@@ -60,6 +66,11 @@ export function ProductDetailPage() {
   }, [id, getProductWithImages]);
 
   useEffect(() => { reload(); }, [reload]);
+
+  useEffect(() => {
+    getDistinctBrands().then(setBrandOptions);
+    getDistinctCategories().then(setCategoryOptions);
+  }, [getDistinctBrands, getDistinctCategories]);
 
   const handleDelete = async () => {
     if (!product?.id) return;
@@ -137,9 +148,18 @@ export function ProductDetailPage() {
     setEditingCategory(false);
   };
 
-  const handleStartEditCustom = (fieldId: string) => {
+  const handleStartEditCustom = async (fieldId: string) => {
     setCustomFieldValue(product?.customData?.[fieldId] ?? '');
     setEditingCustomFieldId(fieldId);
+    const cf = settings.customFields?.find((f) => f.id === fieldId);
+    if (cf?.type === 'dropdown') {
+      const [defOpts, distinct] = await Promise.all([
+        Promise.resolve(cf.options ?? []),
+        getDistinctCustomFieldValues(fieldId),
+      ]);
+      const merged = [...new Set([...defOpts, ...distinct])].sort((a, b) => a.localeCompare(b));
+      setCustomFieldOptionsMap((prev) => ({ ...prev, [fieldId]: merged }));
+    }
   };
 
   const handleSaveCustomField = async () => {
@@ -263,22 +283,15 @@ export function ProductDetailPage() {
           <div className="flex justify-between text-sm items-center">
             <span className="text-on-surface-variant">Brand</span>
             {editingBrand ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
+              <div className="relative">
+                <InlineComboField
                   value={brandValue}
-                  onChange={(e) => setBrandValue(e.target.value)}
-                  className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
-                  autoFocus
+                  onChange={setBrandValue}
+                  options={brandOptions}
                   placeholder="Brand name"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveBrand()}
+                  onSave={handleSaveBrand}
+                  onCancel={() => setEditingBrand(false)}
                 />
-                <button onClick={handleSaveBrand} className="text-primary">
-                  <Icon name="check" size={18} />
-                </button>
-                <button onClick={() => setEditingBrand(false)} className="text-on-surface-variant">
-                  <Icon name="close" size={18} />
-                </button>
               </div>
             ) : (
               <button onClick={handleStartEditBrand} className="flex items-center gap-1 group">
@@ -294,22 +307,15 @@ export function ProductDetailPage() {
           <div className="flex justify-between text-sm items-center">
             <span className="text-on-surface-variant">Category</span>
             {editingCategory ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
+              <div className="relative">
+                <InlineComboField
                   value={categoryValue}
-                  onChange={(e) => setCategoryValue(e.target.value)}
-                  className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
-                  autoFocus
+                  onChange={setCategoryValue}
+                  options={categoryOptions}
                   placeholder="Category"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveCategory()}
+                  onSave={handleSaveCategory}
+                  onCancel={() => setEditingCategory(false)}
                 />
-                <button onClick={handleSaveCategory} className="text-primary">
-                  <Icon name="check" size={18} />
-                </button>
-                <button onClick={() => setEditingCategory(false)} className="text-on-surface-variant">
-                  <Icon name="close" size={18} />
-                </button>
               </div>
             ) : (
               <button onClick={handleStartEditCategory} className="flex items-center gap-1 group">
@@ -325,27 +331,42 @@ export function ProductDetailPage() {
           {(settings.customFields ?? []).map((cf) => {
             const val = product.customData?.[cf.id];
             const isEditing = editingCustomFieldId === cf.id;
+            const isDropdown = cf.type === 'dropdown';
+            const dropdownOptions = customFieldOptionsMap[cf.id] ?? [];
             return (
               <div key={cf.id} className="flex justify-between text-sm items-center">
                 <span className="text-on-surface-variant">{cf.name}</span>
                 {isEditing ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type={cf.type === 'date' ? 'date' : 'text'}
-                      value={customFieldValue}
-                      onChange={(e) => setCustomFieldValue(e.target.value)}
-                      className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
-                      autoFocus
-                      placeholder={cf.name}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveCustomField()}
-                    />
-                    <button onClick={handleSaveCustomField} className="text-primary">
-                      <Icon name="check" size={18} />
-                    </button>
-                    <button onClick={() => setEditingCustomFieldId(null)} className="text-on-surface-variant">
-                      <Icon name="close" size={18} />
-                    </button>
-                  </div>
+                  isDropdown ? (
+                    <div className="relative">
+                      <InlineComboField
+                        value={customFieldValue}
+                        onChange={setCustomFieldValue}
+                        options={dropdownOptions}
+                        placeholder={cf.name}
+                        onSave={handleSaveCustomField}
+                        onCancel={() => setEditingCustomFieldId(null)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type={cf.type === 'date' ? 'date' : 'text'}
+                        value={customFieldValue}
+                        onChange={(e) => setCustomFieldValue(e.target.value)}
+                        className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
+                        autoFocus
+                        placeholder={cf.name}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveCustomField()}
+                      />
+                      <button onClick={handleSaveCustomField} className="text-primary">
+                        <Icon name="check" size={18} />
+                      </button>
+                      <button onClick={() => setEditingCustomFieldId(null)} className="text-on-surface-variant">
+                        <Icon name="close" size={18} />
+                      </button>
+                    </div>
+                  )
                 ) : (
                   <button onClick={() => handleStartEditCustom(cf.id)} className="flex items-center gap-1 group">
                     <span className="font-medium text-on-surface">

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProducts } from '../hooks/useProducts';
+import { useTour } from '../context/TourContext';
 import { ProductCard } from '../components/ProductCard';
 import { ProductListRow } from '../components/ProductListRow';
 import { StickyBottomCTA } from '../components/StickyBottomCTA';
@@ -19,6 +20,7 @@ const DATE_FILTER_MODES: { value: DateFilterOp; label: string }[] = [
 
 export function ProductListPage() {
   const { getProducts, deleteProduct } = useProducts();
+  const { registerProductsCount, startProductsTour, isActive } = useTour();
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,10 @@ export function ProductListPage() {
   }, [getProducts, activeDateFilter]);
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
+
+  useEffect(() => {
+    registerProductsCount(products.length);
+  }, [products.length, registerProductsCount]);
 
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return products;
@@ -113,7 +119,7 @@ export function ProductListPage() {
   return (
     <div className="p-4 max-w-lg mx-auto pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3" data-tour="tour-products-header">
         {selectMode ? (
           <>
             <div className="flex items-center gap-2">
@@ -143,6 +149,16 @@ export function ProductListPage() {
               </span>
             </div>
             <div className="flex items-center gap-1">
+              {!isActive && (
+                <button
+                  onClick={() => startProductsTour(products.length > 0)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface"
+                  title="Products guide"
+                >
+                  <Icon name="help" size={22} />
+                </button>
+              )}
+              <div className="flex items-center gap-1" data-tour="tour-products-search">
               <button
                 onClick={() => { setShowSearch(!showSearch); if (showSearch) setSearchQuery(''); }}
                 className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
@@ -165,6 +181,7 @@ export function ProductListPage() {
               >
                 <Icon name={viewMode === 'grid' ? 'view_list' : 'grid_view'} size={22} />
               </button>
+              </div>
             </div>
           </>
         )}
