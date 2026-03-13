@@ -14,7 +14,7 @@ import type { Product, ProductImage } from '../types';
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty, updateProductBrand, updateProductCategory } = useProducts();
+  const { getProductWithImages, deleteProduct, deleteImage, updateImageTag, updateProductMrp, updateProductQty, updateProductBrand, updateProductCategory, updateProductCustomData } = useProducts();
   const { settings } = useSettings();
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -36,6 +36,10 @@ export function ProductDetailPage() {
   // Inline Category editing
   const [editingCategory, setEditingCategory] = useState(false);
   const [categoryValue, setCategoryValue] = useState('');
+
+  // Inline custom field editing
+  const [editingCustomFieldId, setEditingCustomFieldId] = useState<string | null>(null);
+  const [customFieldValue, setCustomFieldValue] = useState('');
 
   // Delete confirmation state
   const [showDeleteProduct, setShowDeleteProduct] = useState(false);
@@ -131,6 +135,20 @@ export function ProductDetailPage() {
     await updateProductCategory(product.id, category);
     setProduct((prev) => prev ? { ...prev, category } : prev);
     setEditingCategory(false);
+  };
+
+  const handleStartEditCustom = (fieldId: string) => {
+    setCustomFieldValue(product?.customData?.[fieldId] ?? '');
+    setEditingCustomFieldId(fieldId);
+  };
+
+  const handleSaveCustomField = async () => {
+    if (!product?.id || !editingCustomFieldId) return;
+    const val = customFieldValue.trim() || null;
+    const updated = { ...(product.customData ?? {}), [editingCustomFieldId]: val };
+    await updateProductCustomData(product.id, updated);
+    setProduct((prev) => prev ? { ...prev, customData: updated } : prev);
+    setEditingCustomFieldId(null);
   };
 
   const canEditTags = true;
@@ -302,6 +320,43 @@ export function ProductDetailPage() {
               </button>
             )}
           </div>
+
+          {/* Custom fields */}
+          {(settings.customFields ?? []).map((cf) => {
+            const val = product.customData?.[cf.id];
+            const isEditing = editingCustomFieldId === cf.id;
+            return (
+              <div key={cf.id} className="flex justify-between text-sm items-center">
+                <span className="text-on-surface-variant">{cf.name}</span>
+                {isEditing ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type={cf.type === 'date' ? 'date' : 'text'}
+                      value={customFieldValue}
+                      onChange={(e) => setCustomFieldValue(e.target.value)}
+                      className="w-28 px-2 py-1 border border-primary rounded-[var(--md-shape-xs)] text-sm text-on-surface bg-transparent focus:outline-none"
+                      autoFocus
+                      placeholder={cf.name}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveCustomField()}
+                    />
+                    <button onClick={handleSaveCustomField} className="text-primary">
+                      <Icon name="check" size={18} />
+                    </button>
+                    <button onClick={() => setEditingCustomFieldId(null)} className="text-on-surface-variant">
+                      <Icon name="close" size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => handleStartEditCustom(cf.id)} className="flex items-center gap-1 group">
+                    <span className="font-medium text-on-surface">
+                      {val || '—'}
+                    </span>
+                    <Icon name="edit" size={14} className="text-on-surface-variant opacity-0 group-hover:opacity-100 group-active:opacity-100" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
           <div className="flex justify-between text-sm">
             <span className="text-on-surface-variant">Captured</span>

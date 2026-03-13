@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { db } from '../db';
-import type { ExportFormat } from '../types';
+import type { AppSettings, ExportFormat } from '../types';
 import { buildImageName, buildImagePath } from './imagePath';
 
 const DELIMITER_MAP: Record<ExportFormat, string> = {
@@ -20,12 +20,21 @@ function escapeField(value: string, format: ExportFormat): string {
   return value;
 }
 
+async function getCustomFieldNames(): Promise<{ id: string; name: string }[]> {
+  const rows = await db.settings.toArray();
+  if (rows.length === 0) return [];
+  const settings = rows[0] as AppSettings;
+  return settings.customFields ?? [];
+}
+
 async function buildLogContent(productIds: number[], format: ExportFormat): Promise<string> {
   const delimiter = DELIMITER_MAP[format];
   const escape = (val: string) => escapeField(val, format);
 
+  const cfDefs = await getCustomFieldNames();
   const headers = [
     'Barcode', 'MRP', 'Qty', 'Brand', 'Category',
+    ...cfDefs.map((cf) => cf.name),
     'Position Tag', 'Image Name', 'Image Path', 'Captured At',
   ];
 
@@ -34,6 +43,9 @@ async function buildLogContent(productIds: number[], format: ExportFormat): Prom
   for (const pid of productIds) {
     const product = await db.products.get(pid);
     if (!product) continue;
+
+    const customData = product.customData;
+    const cfValues = cfDefs.map((cf) => customData?.[cf.id] ?? '');
 
     const images = await db.images.where('productId').equals(pid).toArray();
 
@@ -44,6 +56,7 @@ async function buildLogContent(productIds: number[], format: ExportFormat): Prom
         product.qty != null ? String(product.qty) : '',
         product.brand || '',
         product.category || '',
+        ...cfValues,
         '', '', '',
         product.capturedAt instanceof Date ? product.capturedAt.toISOString() : String(product.capturedAt),
       ]);
@@ -58,6 +71,7 @@ async function buildLogContent(productIds: number[], format: ExportFormat): Prom
           product.qty != null ? String(product.qty) : '',
           product.brand || '',
           product.category || '',
+          ...cfValues,
           img.positionTag,
           imageName,
           imagePath,

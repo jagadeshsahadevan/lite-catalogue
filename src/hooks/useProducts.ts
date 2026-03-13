@@ -11,6 +11,7 @@ export function useProducts() {
       qty?: number | null,
       brand?: string | null,
       category?: string | null,
+      customData?: Record<string, string | null>,
     ): Promise<number> => {
       const productId = await db.products.add({
         barcode,
@@ -18,6 +19,7 @@ export function useProducts() {
         qty: qty ?? null,
         brand: brand ?? null,
         category: category ?? null,
+        customData: customData ?? {},
         capturedAt: new Date(),
       });
 
@@ -181,6 +183,10 @@ export function useProducts() {
     await db.products.update(productId, { category });
   }, []);
 
+  const updateProductCustomData = useCallback(async (productId: number, customData: Record<string, string | null>) => {
+    await db.products.update(productId, { customData });
+  }, []);
+
   const getImageCount = useCallback(async (productId: number): Promise<number> => {
     return db.images.where('productId').equals(productId).count();
   }, []);
@@ -235,6 +241,7 @@ export function useProducts() {
     updateProductQty,
     updateProductBrand,
     updateProductCategory,
+    updateProductCustomData,
     getImageCount,
     getDistinctBrands,
     getDistinctCategories,

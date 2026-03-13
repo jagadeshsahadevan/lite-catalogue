@@ -92,6 +92,17 @@ class CatalogueDB extends Dexie {
         if (product.category === undefined) product.category = null;
       });
     });
+
+    // v8: Add customData to products
+    this.version(8).stores({
+      settings: '++id',
+      products: '++id, barcode, capturedAt, brand, category',
+      images: '++id, productId, positionTag',
+    }).upgrade((tx) => {
+      return tx.table('products').toCollection().modify((product) => {
+        if (product.customData === undefined) product.customData = {};
+      });
+    });
   }
 }
 

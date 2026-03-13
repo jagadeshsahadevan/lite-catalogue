@@ -1,4 +1,4 @@
-import type { CapturedImage } from '../types';
+import type { CapturedImage, CustomFieldDef } from '../types';
 import { PhotoPreview } from './PhotoPreview';
 import { StickyBottomCTA } from './StickyBottomCTA';
 import { MD3Card } from './md3/MD3Card';
@@ -11,12 +11,14 @@ interface Props {
   qty?: number | null;
   brand?: string | null;
   category?: string | null;
+  customData?: Record<string, string | null>;
+  customFields?: CustomFieldDef[];
   images: CapturedImage[];
   onNext: () => void;
   onDone: () => void;
 }
 
-export function ConfirmationView({ barcode, mrp, qty, brand, category, images, onNext, onDone }: Props) {
+export function ConfirmationView({ barcode, mrp, qty, brand, category, customData, customFields, images, onNext, onDone }: Props) {
   const groupedByTag = images.reduce<Record<string, CapturedImage[]>>((acc, img) => {
     (acc[img.tag] ??= []).push(img);
     return acc;
@@ -61,6 +63,16 @@ export function ConfirmationView({ barcode, mrp, qty, brand, category, images, o
               <span className="font-medium text-on-surface">{category}</span>
             </div>
           )}
+          {customData && customFields && customFields.map((cf) => {
+            const val = customData[cf.id];
+            if (!val) return null;
+            return (
+              <div key={cf.id} className="flex justify-between text-sm">
+                <span className="text-on-surface-variant">{cf.name}</span>
+                <span className="font-medium text-on-surface">{val}</span>
+              </div>
+            );
+          })}
           <div className="flex justify-between text-sm">
             <span className="text-on-surface-variant">Photos</span>
             <span className="font-medium text-on-surface">{images.length}</span>

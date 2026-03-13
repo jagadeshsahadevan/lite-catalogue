@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useOcr } from '../hooks/useOcr';
 import { MD3Button } from './md3/MD3Button';
 import { Icon } from './md3/Icon';
+import type { CustomFieldDef } from '../types';
 
 interface ComboFieldProps {
   label: string;
@@ -78,6 +79,14 @@ function ComboField({ label, value, onChange, options, placeholder }: ComboField
   );
 }
 
+export interface ProductDetailsData {
+  mrp: string | null;
+  qty: number | null;
+  brand: string | null;
+  category: string | null;
+  customData: Record<string, string | null>;
+}
+
 interface Props {
   askMrp: boolean;
   askQty: boolean;
@@ -90,7 +99,9 @@ interface Props {
   categoryOptions: string[];
   lastBrand: string;
   lastCategory: string;
-  onSubmit: (data: { mrp: string | null; qty: number | null; brand: string | null; category: string | null }) => void;
+  fieldOrder: string[];
+  customFields: CustomFieldDef[];
+  onSubmit: (data: ProductDetailsData) => void;
   onAddMorePhotos?: () => void;
 }
 
@@ -99,6 +110,7 @@ export function ProductDetailsInput({
   autoMrpDetect, imageBlob, imageCount,
   brandOptions, categoryOptions,
   lastBrand, lastCategory,
+  fieldOrder, customFields,
   onSubmit, onAddMorePhotos,
 }: Props) {
   const { extractMrp, isProcessing } = useOcr();
@@ -106,6 +118,7 @@ export function ProductDetailsInput({
   const [qty, setQty] = useState('');
   const [brand, setBrand] = useState(lastBrand);
   const [category, setCategory] = useState(lastCategory);
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [ocrDone, setOcrDone] = useState(!autoMrpDetect || !askMrp);
 
   useEffect(() => {
@@ -120,14 +133,26 @@ export function ProductDetailsInput({
     return () => { cancelled = true; };
   }, [autoMrpDetect, askMrp, imageBlob, extractMrp]);
 
-  const gatherData = () => {
+  const setCustomValue = (id: string, value: string) => {
+    setCustomValues((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const gatherData = (): ProductDetailsData => {
     const trimmedQty = qty.trim();
     const parsedQty = trimmedQty === '' ? null : parseInt(trimmedQty, 10);
+    const cd: Record<string, string | null> = {};
+    for (const cf of customFields) {
+      if (cf.enabled) {
+        const v = customValues[cf.id]?.trim();
+        cd[cf.id] = v || null;
+      }
+    }
     return {
       mrp: askMrp ? (mrp.trim() || null) : null,
       qty: askQty ? (isNaN(parsedQty as number) ? null : parsedQty) : null,
       brand: askBrand ? (brand.trim() || null) : null,
       category: askCategory ? (category.trim() || null) : null,
+      customData: cd,
     };
   };
 
@@ -137,28 +162,22 @@ export function ProductDetailsInput({
   };
 
   const handleSkip = () => {
-    onSubmit({ mrp: null, qty: null, brand: null, category: null });
+    onSubmit({ mrp: null, qty: null, brand: null, category: null, customData: {} });
   };
 
-  return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-on-surface">Product Details</h3>
-        {onAddMorePhotos && (
-          <button
-            type="button"
-            onClick={onAddMorePhotos}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium active:bg-primary-container/30"
-          >
-            <Icon name="camera" size={14} />
-            Add Photos ({imageCount})
-          </button>
-        )}
-      </div>
+  const enabledCustomFields = customFields.filter((f) => f.enabled);
+  const hasAnyField = askMrp || askQty || askBrand || askCategory || enabledCustomFields.length > 0;
+  if (!hasAnyField) {
+    handleSkip();
+    return null;
+  }
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {askMrp && (
-          <div>
+  const renderField = (fieldId: string) => {
+    switch (fieldId) {
+      case 'mrp':
+        if (!askMrp) return null;
+        return (
+          <div key="mrp">
             <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-0.5">MRP</label>
             {isProcessing && (
               <div className="flex items-center gap-2 text-xs text-on-surface-variant mb-1">
@@ -182,10 +201,12 @@ export function ProductDetailsInput({
               />
             </div>
           </div>
-        )}
+        );
 
-        {askQty && (
-          <div>
+      case 'qty':
+        if (!askQty) return null;
+        return (
+          <div key="qty">
             <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-0.5">Quantity</label>
             <input
               type="text"
@@ -196,27 +217,100 @@ export function ProductDetailsInput({
               className="w-full px-3 py-2.5 border border-outline rounded-[var(--md-shape-sm)] text-sm text-on-surface bg-transparent focus:outline-none focus:border-primary focus:border-2"
             />
           </div>
-        )}
+        );
 
-        {askBrand && (
+      case 'brand':
+        if (!askBrand) return null;
+        return (
           <ComboField
+            key="brand"
             label="Brand"
             value={brand}
             onChange={setBrand}
             options={brandOptions}
             placeholder="e.g. Samsung, Nike..."
           />
-        )}
+        );
 
-        {askCategory && (
+      case 'category':
+        if (!askCategory) return null;
+        return (
           <ComboField
+            key="category"
             label="Category"
             value={category}
             onChange={setCategory}
             options={categoryOptions}
             placeholder="e.g. Electronics, Clothing..."
           />
+        );
+
+      default: {
+        const cf = customFields.find((f) => f.id === fieldId);
+        if (!cf || !cf.enabled) return null;
+        const val = customValues[cf.id] ?? '';
+
+        if (cf.type === 'dropdown') {
+          return (
+            <ComboField
+              key={cf.id}
+              label={cf.name}
+              value={val}
+              onChange={(v) => setCustomValue(cf.id, v)}
+              options={cf.options ?? []}
+              placeholder={`Enter ${cf.name.toLowerCase()}`}
+            />
+          );
+        }
+
+        if (cf.type === 'date') {
+          return (
+            <div key={cf.id}>
+              <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-0.5">{cf.name}</label>
+              <input
+                type="date"
+                value={val}
+                onChange={(e) => setCustomValue(cf.id, e.target.value)}
+                className="w-full px-3 py-2.5 border border-outline rounded-[var(--md-shape-sm)] text-sm text-on-surface bg-transparent focus:outline-none focus:border-primary focus:border-2"
+              />
+            </div>
+          );
+        }
+
+        return (
+          <div key={cf.id}>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1 ml-0.5">{cf.name}</label>
+            <input
+              type="text"
+              value={val}
+              onChange={(e) => setCustomValue(cf.id, e.target.value)}
+              placeholder={`Enter ${cf.name.toLowerCase()}`}
+              className="w-full px-3 py-2.5 border border-outline rounded-[var(--md-shape-sm)] text-sm text-on-surface bg-transparent focus:outline-none focus:border-primary focus:border-2"
+            />
+          </div>
+        );
+      }
+    }
+  };
+
+  return (
+    <div className="w-full max-w-sm mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-on-surface">Product Details</h3>
+        {onAddMorePhotos && (
+          <button
+            type="button"
+            onClick={onAddMorePhotos}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary text-primary text-xs font-medium active:bg-primary-container/30"
+          >
+            <Icon name="camera" size={14} />
+            Add Photos ({imageCount})
+          </button>
         )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {fieldOrder.map(renderField)}
 
         <div className="flex gap-3 pt-1">
           <MD3Button type="button" variant="outlined" onClick={handleSkip} className="flex-1">

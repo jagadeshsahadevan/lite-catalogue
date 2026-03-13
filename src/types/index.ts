@@ -2,12 +2,24 @@ export type CaptureMode = 'single' | 'front-back' | 'front-back-more';
 export type ExportFormat = 'csv' | 'tsv' | 'psv';
 export type ViewMode = 'grid' | 'list';
 export type DateFilterOp = 'equal' | 'gte' | 'between';
+export type CustomFieldType = 'text' | 'date' | 'dropdown';
 
 export interface DateFilter {
   op: DateFilterOp;
   date: string;
   dateTo?: string;
 }
+
+export interface CustomFieldDef {
+  id: string;
+  name: string;
+  type: CustomFieldType;
+  enabled: boolean;
+  options?: string[];
+}
+
+export const BUILTIN_FIELD_IDS = ['mrp', 'qty', 'brand', 'category'] as const;
+export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
 
 export interface AppSettings {
   id?: number;
@@ -25,6 +37,8 @@ export interface AppSettings {
   hapticFeedback: boolean;
   autoMrpDetection: boolean;
   lastCsvDownloadDate?: string | null;
+  customFields: CustomFieldDef[];
+  fieldOrder: string[];
 }
 
 export interface Product {
@@ -34,6 +48,7 @@ export interface Product {
   qty?: number | null;
   brand?: string | null;
   category?: string | null;
+  customData?: Record<string, string | null>;
   capturedAt: Date;
 }
 
@@ -71,6 +86,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hapticFeedback: true,
   autoMrpDetection: false,
   lastCsvDownloadDate: null,
+  customFields: [],
+  fieldOrder: ['mrp', 'qty', 'brand', 'category'],
 };
 
 export const PRESET_TAGS = ['Front', 'Back', 'Left', 'Right', 'Top', 'Bottom', 'Label', 'Barcode'];

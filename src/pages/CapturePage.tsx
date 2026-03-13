@@ -28,6 +28,7 @@ interface State {
   qty: number | null;
   brand: string | null;
   category: string | null;
+  customData: Record<string, string | null>;
   photoIndex: number;
   mergeTargetId: number | null;
   replaceMode: boolean;
@@ -42,7 +43,7 @@ type Action =
   | { type: 'NEW_PRODUCT_CHOSEN' }
   | { type: 'CAPTURE'; blob: Blob; captureMode: CaptureMode; hasDetails: boolean; allTags: string[] }
   | { type: 'SELECT_TAG'; tag: string }
-  | { type: 'SET_DETAILS'; mrp: string | null; qty: number | null; brand: string | null; category: string | null }
+  | { type: 'SET_DETAILS'; mrp: string | null; qty: number | null; brand: string | null; category: string | null; customData: Record<string, string | null> }
   | { type: 'DONE_ADDING'; hasDetails: boolean }
   | { type: 'BACK_TO_PHOTOS' }
   | { type: 'DELETE_IMAGE'; index: number }
@@ -56,6 +57,7 @@ const initialState: State = {
   qty: null,
   brand: null,
   category: null,
+  customData: {},
   photoIndex: 0,
   mergeTargetId: null,
   replaceMode: false,
@@ -137,7 +139,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, selectedTag: action.tag };
 
     case 'SET_DETAILS':
-      return { ...state, mrp: action.mrp, qty: action.qty, brand: action.brand, category: action.category, step: 'confirming' };
+      return { ...state, mrp: action.mrp, qty: action.qty, brand: action.brand, category: action.category, customData: action.customData, step: 'confirming' };
 
     case 'DONE_ADDING': {
       const isReshoot = !!state.mergeTargetId;
@@ -345,7 +347,8 @@ export function CapturePage() {
   }, []);
 
   const { captureMode, askMrp, askQty, askBrand, askCategory } = settings;
-  const hasDetails = askMrp || askQty || askBrand || askCategory;
+  const enabledCustomFields = (settings.customFields ?? []).filter((f) => f.enabled);
+  const hasDetails = askMrp || askQty || askBrand || askCategory || enabledCustomFields.length > 0;
   const allTags = [...PRESET_TAGS, ...settings.customTags];
 
   const handleScan = useCallback(async (raw: string) => {
@@ -383,7 +386,7 @@ export function CapturePage() {
     dispatch({ type: 'DONE_ADDING', hasDetails });
   }, [hasDetails]);
 
-  const handleDetails = useCallback((data: { mrp: string | null; qty: number | null; brand: string | null; category: string | null }) => {
+  const handleDetails = useCallback((data: { mrp: string | null; qty: number | null; brand: string | null; category: string | null; customData: Record<string, string | null> }) => {
     dispatch({ type: 'SET_DETAILS', ...data });
   }, []);
 
@@ -395,7 +398,7 @@ export function CapturePage() {
     if (state.replaceMode && state.mergeTargetId) {
       await replaceAllImages(state.mergeTargetId, state.images);
     } else {
-      await createProduct(state.barcode, state.mrp, state.images, state.qty, state.brand, state.category);
+      await createProduct(state.barcode, state.mrp, state.images, state.qty, state.brand, state.category, state.customData);
     }
     getDistinctBrands().then(setBrandOptions);
     getDistinctCategories().then(setCategoryOptions);
@@ -568,6 +571,8 @@ export function CapturePage() {
               categoryOptions={categoryOptions}
               lastBrand={lastBrand}
               lastCategory={lastCategory}
+              fieldOrder={settings.fieldOrder ?? ['mrp', 'qty', 'brand', 'category']}
+              customFields={settings.customFields ?? []}
               onSubmit={handleDetails}
               onAddMorePhotos={handleBackToPhotos}
             />
@@ -582,6 +587,8 @@ export function CapturePage() {
               qty={state.qty}
               brand={state.brand}
               category={state.category}
+              customData={state.customData}
+              customFields={settings.customFields ?? []}
               images={state.images}
               onNext={handleNext}
               onDone={handleDone}
