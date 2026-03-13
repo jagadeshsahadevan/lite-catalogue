@@ -9,7 +9,7 @@ import { MD3TopBar } from '../components/md3/MD3TopBar';
 import { MD3Button } from '../components/md3/MD3Button';
 import { Icon } from '../components/md3/Icon';
 import type { CaptureMode, CustomFieldDef, CustomFieldType, AppSettings } from '../types';
-import { BUILTIN_FIELD_IDS } from '../types';
+import { BUILTIN_FIELD_IDS, DEFAULT_SETTINGS } from '../types';
 
 const modeOptions: { value: CaptureMode; label: string }[] = [
   { value: 'single', label: 'Single Photo' },
@@ -51,6 +51,7 @@ export function SettingsPage() {
   const [cfOptions, setCfOptions] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<'success' | 'error' | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = (field: 'phone' | 'brand') => {
@@ -172,6 +173,15 @@ export function SettingsPage() {
       typeof o.captureMode === 'string' &&
       ['single', 'front-back', 'front-back-more'].includes(o.captureMode)
     );
+  };
+
+  const handleResetSettings = () => {
+    const toReset = { ...DEFAULT_SETTINGS };
+    if (settings.id) toReset.id = settings.id;
+    if (settings.setupComplete) toReset.setupComplete = true;
+    if (settings.onboardingComplete) toReset.onboardingComplete = true;
+    updateSettings(toReset);
+    setShowResetConfirm(false);
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -577,7 +587,39 @@ export function SettingsPage() {
             </div>
           )}
         </section>
+
+        {/* Reset */}
+        <section className="space-y-2 pt-6">
+          <MD3Card variant="outlined">
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left"
+            >
+              <span className="text-sm text-error">Reset settings</span>
+              <Icon name="refresh" size={20} className="text-error" />
+            </button>
+          </MD3Card>
+        </section>
       </div>
+
+      {/* Reset confirmation */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowResetConfirm(false)}>
+          <div className="bg-surface rounded-[var(--md-shape-lg)] p-6 max-w-sm w-full shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <Icon name="warning" size={24} className="text-error flex-shrink-0" />
+              <h3 className="text-lg font-medium text-on-surface">Reset settings?</h3>
+            </div>
+            <p className="text-sm text-on-surface-variant">
+              All settings will be restored to defaults. Profile, capture mode, custom fields, and preferences will be reset. Your products and photos are not affected.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <MD3Button variant="text" onClick={() => setShowResetConfirm(false)}>Cancel</MD3Button>
+              <MD3Button variant="filled" onClick={handleResetSettings} className="!bg-error !text-on-error">Reset</MD3Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Custom Field Dialog */}
       {showAddField && (
