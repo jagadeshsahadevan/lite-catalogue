@@ -49,10 +49,11 @@ const CAPTURE_STEPS: TourStep[] = [
     page: '/capture',
     target: 'manual-barcode-btn',
     title: 'Enter Manually',
-    description: 'Tap "Enter barcode manually" to type it. Or tap Next to auto-fill a demo barcode and continue.',
+    description: 'Tap "Enter barcode manually" to type it. Or wait — a demo barcode will auto-fill so you can continue.',
     position: 'top',
     icon: '⌨️',
     interactive: true,
+    autoAdvanceMs: 10000,
   },
   {
     id: 'take-photos',

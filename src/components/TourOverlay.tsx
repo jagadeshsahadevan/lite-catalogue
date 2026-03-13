@@ -231,23 +231,25 @@ export function TourOverlay() {
           </div>
 
           <div className="px-4 py-3 space-y-2">
-            {/* Icon + step counter + countdown */}
+            {/* Header: icon + title + close */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{currentStep.icon}</span>
-                <h3 className="text-sm font-semibold text-on-surface leading-tight">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-xl flex-shrink-0">{currentStep.icon}</span>
+                <h3 className="text-sm font-semibold text-on-surface leading-tight truncate">
                   {currentStep.title}
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
-                {countdown !== null && countdown > 0 && (
-                  <span className="text-[10px] text-on-surface-variant font-mono bg-surface-container px-1.5 py-0.5 rounded">
-                    {countdown}s
-                  </span>
-                )}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 <span className="text-[10px] text-on-surface-variant font-medium bg-surface-container px-1.5 py-0.5 rounded-full">
                   {stepIndex + 1}/{totalSteps}
                 </span>
+                <button
+                  onClick={skipTour}
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-surface-container active:bg-surface-container-high"
+                  title="Close tour"
+                >
+                  <Icon name="close" size={14} className="text-on-surface-variant" />
+                </button>
               </div>
             </div>
 
@@ -267,20 +269,13 @@ export function TourOverlay() {
                 </button>
               )}
 
-              <button
-                onClick={skipTour}
-                className="text-[11px] text-on-surface-variant font-medium px-2 py-1.5 rounded-full active:bg-surface-container-high"
-              >
-                {isLast ? '' : 'Skip'}
-              </button>
-
               <div className="flex-1" />
 
               <button
                 onClick={() => { clearTimers(); nextStep(); }}
-                className="h-9 px-4 rounded-full bg-primary text-on-primary text-xs font-medium flex items-center gap-1 active:brightness-90 shadow-sm"
+                className="h-9 px-4 rounded-full bg-primary text-on-primary text-xs font-medium flex items-center gap-1.5 active:brightness-90 shadow-sm"
               >
-                {isLast ? 'Done' : 'Next'}
+                {isLast ? 'Done' : countdown !== null && countdown > 0 ? `Next (${countdown}s)` : 'Next'}
                 {!isLast && <Icon name="chevron_right" size={14} className="text-on-primary" />}
               </button>
             </div>
