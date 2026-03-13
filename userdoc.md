@@ -29,9 +29,36 @@ On first launch you'll see the **Setup** screen:
 
 ### Step 1: Scan Barcode
 - Point your camera at a barcode — it auto-detects
-- Supported formats: QR Code, EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, Code 93, ITF, Codabar, Data Matrix, PDF-417
 - Or tap **Enter Manually** to type the barcode number
 - Phone vibrates on successful scan
+
+#### Supported Barcode Formats
+
+**1D Barcodes:**
+| Format | Common Use |
+|--------|-----------|
+| UPC-A | US/Canada retail products |
+| UPC-E | Compressed UPC for small packages |
+| EAN-13 | International retail (13-digit) |
+| EAN-8 | Small packages (8-digit) |
+| Code 128 | Shipping, logistics, general purpose |
+| Code 39 | Automotive, defense, healthcare |
+| Code 93 | Logistics, inventory |
+| ITF (Interleaved 2 of 5) | Carton labels, warehousing |
+| Codabar | Libraries, blood banks, parcels |
+| GS1 DataBar (RSS-14) | Fresh produce, coupons, small items |
+| GS1 DataBar Expanded | Variable-weight items, coupons with extra data |
+| UPC/EAN Extensions | 2- or 5-digit add-ons (magazines, books) |
+
+**2D Barcodes:**
+| Format | Common Use |
+|--------|-----------|
+| QR Code | General purpose, URLs, product info |
+| GS1 QR Code | Product traceability with GS1 Application Identifiers |
+| Data Matrix | Electronics, healthcare, small-part marking |
+| PDF-417 | ID cards, shipping labels, government docs |
+| Aztec | Boarding passes, transport tickets |
+| MaxiCode | UPS package sorting |
 
 ### Step 2: Duplicate Barcode Handling
 If the scanned barcode already exists, you'll see options:

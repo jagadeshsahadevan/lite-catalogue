@@ -9,24 +9,39 @@ import {
 } from '../utils/barcodeImageEnhancer';
 
 const SUPPORTED_FORMATS = [
+  // 2D
   Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.PDF_417,
+  Html5QrcodeSupportedFormats.AZTEC,
+  Html5QrcodeSupportedFormats.MAXICODE,
+  // 1D — EAN / UPC family
   Html5QrcodeSupportedFormats.EAN_13,
   Html5QrcodeSupportedFormats.EAN_8,
   Html5QrcodeSupportedFormats.UPC_A,
   Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+  // 1D — Code family
   Html5QrcodeSupportedFormats.CODE_128,
   Html5QrcodeSupportedFormats.CODE_39,
   Html5QrcodeSupportedFormats.CODE_93,
+  // 1D — Other
   Html5QrcodeSupportedFormats.ITF,
   Html5QrcodeSupportedFormats.CODABAR,
-  Html5QrcodeSupportedFormats.DATA_MATRIX,
-  Html5QrcodeSupportedFormats.PDF_417,
+  // GS1 DataBar (RSS) — used for GS1-128 / GS1 DataBar barcodes
+  Html5QrcodeSupportedFormats.RSS_14,
+  Html5QrcodeSupportedFormats.RSS_EXPANDED,
 ];
 
 const BARCODE_DETECTOR_FORMATS = [
-  'qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e',
-  'code_128', 'code_39', 'code_93', 'itf', 'codabar',
-  'data_matrix', 'pdf417',
+  // 2D
+  'qr_code', 'data_matrix', 'pdf417', 'aztec',
+  // 1D — EAN / UPC
+  'ean_13', 'ean_8', 'upc_a', 'upc_e',
+  // 1D — Code family
+  'code_128', 'code_39', 'code_93',
+  // 1D — Other
+  'itf', 'codabar',
 ] as const;
 
 const ENHANCED_DECODE_MS = 250;
