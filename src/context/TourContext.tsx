@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export interface TourStep {
@@ -9,14 +9,16 @@ export interface TourStep {
   description: string;
   position?: 'top' | 'bottom' | 'center';
   icon?: string;
+  interactive?: boolean;
+  autoAdvanceMs?: number;
 }
 
-const TOUR_STEPS: TourStep[] = [
+const CAPTURE_STEPS: TourStep[] = [
   {
     id: 'welcome',
     page: '/capture',
     title: 'Welcome to Lite Catalogue',
-    description: 'Let\'s walk through how to digitise your store inventory. This will only take a minute.',
+    description: 'Let\'s walk through how to digitise your store inventory. This only takes a minute.',
     position: 'center',
     icon: '👋',
   },
@@ -25,49 +27,46 @@ const TOUR_STEPS: TourStep[] = [
     page: '/capture',
     target: 'barcode-scanner',
     title: 'Step 1: Scan Barcode',
-    description: 'Point your camera at a product barcode. The scanner will automatically detect and read it.',
+    description: 'Point your camera at a barcode. It will auto-detect. If not scanned, we\'ll move to the next tip automatically.',
     position: 'bottom',
     icon: '📷',
+    interactive: true,
+    autoAdvanceMs: 10000,
   },
   {
     id: 'flash-control',
     page: '/capture',
     target: 'scanner-flash-btn',
     title: 'Use Flash',
-    description: 'If lighting is poor, tap the flash icon in the top-right corner of the scanner for better visibility.',
+    description: 'Lighting poor? Tap the flash icon for better visibility. Still auto-advancing if not scanned...',
     position: 'bottom',
     icon: '⚡',
+    interactive: true,
+    autoAdvanceMs: 10000,
   },
   {
     id: 'manual-entry',
     page: '/capture',
     target: 'manual-barcode-btn',
     title: 'Enter Manually',
-    description: 'Can\'t scan? Tap "Enter barcode manually" to type it in. Type at least 3 characters and tap Go.',
+    description: 'Tap "Enter barcode manually" to type it. Or tap Next to auto-fill a demo barcode and continue.',
     position: 'top',
     icon: '⌨️',
+    interactive: true,
   },
   {
     id: 'take-photos',
     page: '/capture',
     title: 'Step 2: Take Photos',
-    description: 'After the barcode is scanned, the camera opens. Point it at the product and tap the big white capture button.',
+    description: 'After scanning, the camera opens. Point at the product and tap the big white capture button to photograph it.',
     position: 'center',
     icon: '📸',
-  },
-  {
-    id: 'capture-btn',
-    page: '/capture',
-    title: 'Capture Button',
-    description: 'This large white circle is your capture button. Tap it each time you want to take a product photo.',
-    position: 'center',
-    icon: '⭕',
   },
   {
     id: 'done-photos',
     page: '/capture',
     title: 'Done Taking Photos',
-    description: 'Once you\'ve captured one or more photos, a green "Done" button appears. Tap it to proceed.',
+    description: 'Once you have enough photos, tap the "Done" button to proceed. You can always add more later.',
     position: 'center',
     icon: '✅',
   },
@@ -75,7 +74,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'product-details',
     page: '/capture',
     title: 'Step 3: Add Details',
-    description: 'Fill in MRP, quantity, brand, and category — all on one page. Only fields you\'ve enabled in Settings will show.',
+    description: 'Fill in MRP, quantity, brand, category — all on one page. Only fields enabled in Settings will appear.',
     position: 'center',
     icon: '📝',
   },
@@ -83,16 +82,19 @@ const TOUR_STEPS: TourStep[] = [
     id: 'skip-continue',
     page: '/capture',
     title: 'Skip or Continue',
-    description: 'Tap "Continue" to save the details, or "Skip" to save the product without details. You can edit them later.',
+    description: 'Tap "Continue" to save details, or "Skip" to save without. You can always edit them later from the product page.',
     position: 'center',
     icon: '⏭️',
   },
+];
+
+const PRODUCTS_STEPS: TourStep[] = [
   {
     id: 'products-tab',
     page: '/products',
     target: 'nav-products',
-    title: 'Step 4: View Products',
-    description: 'Tap the Products tab to see all your captured items, sorted by most recent.',
+    title: 'View Products',
+    description: 'All your captured products appear here, sorted by most recent. Use search and filters to find items.',
     position: 'top',
     icon: '📦',
   },
@@ -100,46 +102,60 @@ const TOUR_STEPS: TourStep[] = [
     id: 'select-products',
     page: '/products',
     title: 'Select Products',
-    description: 'Each product card has a checkbox. Tap it to select products for sharing or deleting.',
+    description: 'Each product card has a checkbox. Tap it to select one or more products for sharing or deleting.',
     position: 'center',
     icon: '☑️',
   },
   {
     id: 'share-products',
     page: '/products',
-    title: 'Step 5: Share',
-    description: 'After selecting products, tap "Share" to send a zip file containing all product images and a CSV catalogue.',
+    title: 'Share',
+    description: 'After selecting, tap "Share" to send a single zip file containing all product images and a CSV catalogue.',
     position: 'center',
     icon: '🔗',
   },
+];
+
+const SETTINGS_STEPS: TourStep[] = [
   {
     id: 'settings-tab',
     page: '/settings',
     target: 'nav-settings',
     title: 'Settings',
-    description: 'Configure capture mode, toggle MRP/Quantity/Brand/Category, and manage your profile in Settings.',
+    description: 'Configure capture mode, toggle MRP/Quantity/Brand/Category fields, manage your profile, and control haptic feedback.',
     position: 'top',
     icon: '⚙️',
   },
-  {
-    id: 'finish',
-    page: '/settings',
-    title: 'You\'re All Set!',
-    description: 'Start capturing products now. Tap the help icon anytime to see this guide again.',
-    position: 'center',
-    icon: '🎉',
-  },
 ];
+
+const FINISH_STEP: TourStep = {
+  id: 'finish',
+  page: '/capture',
+  title: 'You\'re All Set!',
+  description: 'Start capturing products now. Tap the help icon anytime to revisit this guide.',
+  position: 'center',
+  icon: '🎉',
+};
+
+const FULL_TOUR = [...CAPTURE_STEPS, ...PRODUCTS_STEPS, ...SETTINGS_STEPS, FINISH_STEP];
+
+type TourMode = 'full' | 'page';
 
 interface TourContextValue {
   isActive: boolean;
   currentStep: TourStep | null;
   stepIndex: number;
   totalSteps: number;
+  tourMode: TourMode;
+  showFullTourOffer: boolean;
   startTour: () => void;
+  startPageTour: () => void;
   nextStep: () => void;
   prevStep: () => void;
   skipTour: () => void;
+  acceptFullTour: () => void;
+  declineFullTour: () => void;
+  registerAutoScan: (cb: (barcode: string) => void) => void;
 }
 
 const TourContext = createContext<TourContextValue>({
@@ -147,23 +163,39 @@ const TourContext = createContext<TourContextValue>({
   currentStep: null,
   stepIndex: 0,
   totalSteps: 0,
+  tourMode: 'full',
+  showFullTourOffer: false,
   startTour: () => {},
+  startPageTour: () => {},
   nextStep: () => {},
   prevStep: () => {},
   skipTour: () => {},
+  acceptFullTour: () => {},
+  declineFullTour: () => {},
+  registerAutoScan: () => {},
 });
 
 export function useTour() {
   return useContext(TourContext);
 }
 
+function getPageSteps(pathname: string): TourStep[] {
+  if (pathname.startsWith('/products')) return PRODUCTS_STEPS;
+  if (pathname.startsWith('/settings')) return SETTINGS_STEPS;
+  return CAPTURE_STEPS;
+}
+
 export function TourProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false);
+  const [steps, setSteps] = useState<TourStep[]>(FULL_TOUR);
   const [stepIndex, setStepIndex] = useState(0);
+  const [tourMode, setTourMode] = useState<TourMode>('full');
+  const [showFullTourOffer, setShowFullTourOffer] = useState(false);
+  const autoScanRef = useRef<((barcode: string) => void) | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const currentStep = active ? TOUR_STEPS[stepIndex] ?? null : null;
+  const currentStep = active ? steps[stepIndex] ?? null : null;
 
   const navigateToStep = useCallback((step: TourStep) => {
     if (!location.pathname.startsWith(step.page)) {
@@ -172,33 +204,92 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [navigate, location.pathname]);
 
   const startTour = useCallback(() => {
+    setSteps(FULL_TOUR);
     setStepIndex(0);
+    setTourMode('full');
+    setShowFullTourOffer(false);
     setActive(true);
     navigate('/capture');
   }, [navigate]);
 
+  const startPageTour = useCallback(() => {
+    const isCapturePage = location.pathname.startsWith('/capture');
+    if (isCapturePage) {
+      startTour();
+      return;
+    }
+    const pageSteps = getPageSteps(location.pathname);
+    setSteps(pageSteps);
+    setStepIndex(0);
+    setTourMode('page');
+    setShowFullTourOffer(false);
+    setActive(true);
+  }, [location.pathname, startTour]);
+
+  const injectAutoScanIfNeeded = useCallback(() => {
+    const step = steps[stepIndex];
+    if (!step) return;
+    const isScanRelated = step.id === 'scan-barcode' || step.id === 'flash-control' || step.id === 'manual-entry';
+    if (isScanRelated && autoScanRef.current) {
+      autoScanRef.current(String(Date.now()));
+    }
+  }, [steps, stepIndex]);
+
   const nextStep = useCallback(() => {
     const next = stepIndex + 1;
-    if (next >= TOUR_STEPS.length) {
+    if (next >= steps.length) {
+      if (tourMode === 'page') {
+        setActive(false);
+        setShowFullTourOffer(true);
+        return;
+      }
       setActive(false);
       setStepIndex(0);
       navigate('/capture');
       return;
     }
+
+    const nextS = steps[next];
+    const currentS = steps[stepIndex];
+    const isScanRelated = currentS?.id === 'scan-barcode' || currentS?.id === 'flash-control' || currentS?.id === 'manual-entry';
+    const nextIsScanRelated = nextS?.id === 'scan-barcode' || nextS?.id === 'flash-control' || nextS?.id === 'manual-entry';
+
+    if (isScanRelated && !nextIsScanRelated) {
+      injectAutoScanIfNeeded();
+    }
+
     setStepIndex(next);
-    navigateToStep(TOUR_STEPS[next]);
-  }, [stepIndex, navigateToStep, navigate]);
+    navigateToStep(nextS);
+  }, [stepIndex, steps, tourMode, navigateToStep, navigate, injectAutoScanIfNeeded]);
 
   const prevStep = useCallback(() => {
     const prev = stepIndex - 1;
     if (prev < 0) return;
     setStepIndex(prev);
-    navigateToStep(TOUR_STEPS[prev]);
-  }, [stepIndex, navigateToStep]);
+    navigateToStep(steps[prev]);
+  }, [stepIndex, steps, navigateToStep]);
 
   const skipTour = useCallback(() => {
     setActive(false);
     setStepIndex(0);
+    setShowFullTourOffer(false);
+  }, []);
+
+  const acceptFullTour = useCallback(() => {
+    setShowFullTourOffer(false);
+    setSteps(FULL_TOUR);
+    setStepIndex(0);
+    setTourMode('full');
+    setActive(true);
+    navigate('/capture');
+  }, [navigate]);
+
+  const declineFullTour = useCallback(() => {
+    setShowFullTourOffer(false);
+  }, []);
+
+  const registerAutoScan = useCallback((cb: (barcode: string) => void) => {
+    autoScanRef.current = cb;
   }, []);
 
   useEffect(() => {
@@ -212,11 +303,17 @@ export function TourProvider({ children }: { children: ReactNode }) {
       isActive: active,
       currentStep,
       stepIndex,
-      totalSteps: TOUR_STEPS.length,
+      totalSteps: steps.length,
+      tourMode,
+      showFullTourOffer,
       startTour,
+      startPageTour,
       nextStep,
       prevStep,
       skipTour,
+      acceptFullTour,
+      declineFullTour,
+      registerAutoScan,
     }}>
       {children}
     </TourContext.Provider>

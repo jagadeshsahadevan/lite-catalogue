@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTour } from '../context/TourContext';
 import { Icon } from './md3/Icon';
+import { MD3Button } from './md3/MD3Button';
 
 interface Rect {
   top: number;
@@ -9,16 +10,58 @@ interface Rect {
   height: number;
 }
 
+function FullTourOffer() {
+  const { acceptFullTour, declineFullTour } = useTour();
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={declineFullTour}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div
+        className="relative bg-surface rounded-2xl shadow-2xl w-[min(340px,calc(100vw-32px))] overflow-hidden border border-outline-variant/50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 space-y-4 text-center">
+          <span className="text-3xl">🎓</span>
+          <h3 className="text-base font-semibold text-on-surface">Want the full tour?</h3>
+          <p className="text-sm text-on-surface-variant">
+            You've seen this page's features. Would you like a complete walkthrough of the entire app?
+          </p>
+          <div className="flex gap-3 pt-1">
+            <MD3Button variant="outlined" onClick={declineFullTour} className="flex-1">
+              No thanks
+            </MD3Button>
+            <MD3Button variant="filled" onClick={acceptFullTour} className="flex-1">
+              Show full tour
+            </MD3Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TourOverlay() {
-  const { isActive, currentStep, stepIndex, totalSteps, nextStep, prevStep, skipTour } = useTour();
+  const {
+    isActive, currentStep, stepIndex, totalSteps,
+    nextStep, prevStep, skipTour, showFullTourOffer,
+  } = useTour();
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [visible, setVisible] = useState(false);
-  const rafRef = useRef(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (autoRef.current) { clearTimeout(autoRef.current); autoRef.current = null; }
+    setCountdown(null);
+  }, []);
 
   useEffect(() => {
     if (!isActive || !currentStep) {
       setVisible(false);
       setTargetRect(null);
+      clearTimers();
       return;
     }
 
@@ -28,7 +71,6 @@ export function TourOverlay() {
         setVisible(true);
         return;
       }
-
       const el = document.querySelector(`[data-tour="${currentStep.target}"]`);
       if (el) {
         const rect = el.getBoundingClientRect();
@@ -39,30 +81,62 @@ export function TourOverlay() {
           width: rect.width + padding * 2,
           height: rect.height + padding * 2,
         });
-        setVisible(true);
       } else {
         setTargetRect(null);
-        setVisible(true);
       }
+      setVisible(true);
     };
 
     const timer = setTimeout(findTarget, 150);
 
-    return () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [isActive, currentStep, stepIndex]);
+    return () => { clearTimeout(timer); };
+  }, [isActive, currentStep, stepIndex, clearTimers]);
 
+  useEffect(() => {
+    clearTimers();
+    if (!isActive || !currentStep?.autoAdvanceMs) return;
+
+    const totalMs = currentStep.autoAdvanceMs;
+    const startTime = Date.now();
+    setCountdown(Math.ceil(totalMs / 1000));
+
+    timerRef.current = setInterval(() => {
+      const remaining = Math.max(0, totalMs - (Date.now() - startTime));
+      setCountdown(Math.ceil(remaining / 1000));
+      if (remaining <= 0 && timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }, 500);
+
+    autoRef.current = setTimeout(() => {
+      nextStep();
+    }, totalMs);
+
+    return clearTimers;
+  }, [isActive, currentStep, stepIndex, nextStep, clearTimers]);
+
+  if (showFullTourOffer) return <FullTourOffer />;
   if (!isActive || !currentStep || !visible) return null;
 
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === totalSteps - 1;
   const progress = ((stepIndex + 1) / totalSteps) * 100;
-
-  const tooltipPosition = currentStep.position ?? 'center';
+  const isInteractive = !!currentStep.interactive;
 
   const getTooltipStyle = (): React.CSSProperties => {
+    if (isInteractive) {
+      return {
+        position: 'fixed',
+        bottom: '80px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        maxWidth: 'calc(100vw - 24px)',
+      };
+    }
+
+    const tooltipPosition = currentStep.position ?? 'center';
+
     if (!targetRect || tooltipPosition === 'center') {
       return {
         position: 'fixed',
@@ -100,34 +174,36 @@ export function TourOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100]" onClick={skipTour}>
-      {/* Overlay with spotlight cutout */}
-      <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
-        <defs>
-          <mask id="tour-mask">
-            <rect x="0" y="0" width="100%" height="100%" fill="white" />
-            {targetRect && (
-              <rect
-                x={targetRect.left}
-                y={targetRect.top}
-                width={targetRect.width}
-                height={targetRect.height}
-                rx="12"
-                fill="black"
-              />
-            )}
-          </mask>
-        </defs>
-        <rect
-          x="0" y="0" width="100%" height="100%"
-          fill="rgba(0,0,0,0.7)"
-          mask="url(#tour-mask)"
-          style={{ pointerEvents: 'auto' }}
-        />
-      </svg>
+    <div className="fixed inset-0 z-[100]" style={isInteractive ? { pointerEvents: 'none' } : undefined} onClick={isInteractive ? undefined : skipTour}>
+      {/* Overlay — skip for interactive steps */}
+      {!isInteractive && (
+        <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
+          <defs>
+            <mask id="tour-mask">
+              <rect x="0" y="0" width="100%" height="100%" fill="white" />
+              {targetRect && (
+                <rect
+                  x={targetRect.left}
+                  y={targetRect.top}
+                  width={targetRect.width}
+                  height={targetRect.height}
+                  rx="12"
+                  fill="black"
+                />
+              )}
+            </mask>
+          </defs>
+          <rect
+            x="0" y="0" width="100%" height="100%"
+            fill="rgba(0,0,0,0.7)"
+            mask="url(#tour-mask)"
+            style={{ pointerEvents: 'auto' }}
+          />
+        </svg>
+      )}
 
-      {/* Spotlight pulse ring */}
-      {targetRect && (
+      {/* Spotlight pulse ring — non-interactive only */}
+      {!isInteractive && targetRect && (
         <div
           className="absolute rounded-xl border-2 border-primary animate-pulse pointer-events-none"
           style={{
@@ -141,11 +217,11 @@ export function TourOverlay() {
 
       {/* Tooltip card */}
       <div
-        style={getTooltipStyle()}
-        className="w-[min(340px,calc(100vw-32px))] z-[101]"
+        style={{ ...getTooltipStyle(), pointerEvents: 'auto' }}
+        className="w-[min(340px,calc(100vw-24px))] z-[101]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-surface rounded-2xl shadow-2xl overflow-hidden border border-outline-variant/50">
+        <div className={`bg-surface rounded-2xl shadow-2xl overflow-hidden border border-outline-variant/50 ${isInteractive ? 'shadow-[0_0_30px_rgba(0,0,0,0.3)]' : ''}`}>
           {/* Progress bar */}
           <div className="h-1 bg-surface-container">
             <div
@@ -154,51 +230,58 @@ export function TourOverlay() {
             />
           </div>
 
-          <div className="p-5 space-y-3">
-            {/* Icon + step counter */}
+          <div className="px-4 py-3 space-y-2">
+            {/* Icon + step counter + countdown */}
             <div className="flex items-center justify-between">
-              <span className="text-2xl">{currentStep.icon}</span>
-              <span className="text-xs text-on-surface-variant font-medium bg-surface-container px-2 py-0.5 rounded-full">
-                {stepIndex + 1} / {totalSteps}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{currentStep.icon}</span>
+                <h3 className="text-sm font-semibold text-on-surface leading-tight">
+                  {currentStep.title}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {countdown !== null && countdown > 0 && (
+                  <span className="text-[10px] text-on-surface-variant font-mono bg-surface-container px-1.5 py-0.5 rounded">
+                    {countdown}s
+                  </span>
+                )}
+                <span className="text-[10px] text-on-surface-variant font-medium bg-surface-container px-1.5 py-0.5 rounded-full">
+                  {stepIndex + 1}/{totalSteps}
+                </span>
+              </div>
             </div>
 
-            {/* Title */}
-            <h3 className="text-base font-semibold text-on-surface leading-tight">
-              {currentStep.title}
-            </h3>
-
             {/* Description */}
-            <p className="text-sm text-on-surface-variant leading-relaxed">
+            <p className="text-xs text-on-surface-variant leading-relaxed">
               {currentStep.description}
             </p>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2">
               {!isFirst && (
                 <button
                   onClick={prevStep}
-                  className="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container active:bg-surface-container-high"
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container active:bg-surface-container-high"
                 >
-                  <Icon name="arrow-back" size={18} className="text-on-surface-variant" />
+                  <Icon name="arrow-back" size={16} className="text-on-surface-variant" />
                 </button>
               )}
 
               <button
                 onClick={skipTour}
-                className="text-xs text-on-surface-variant font-medium px-3 py-2 rounded-full active:bg-surface-container-high"
+                className="text-[11px] text-on-surface-variant font-medium px-2 py-1.5 rounded-full active:bg-surface-container-high"
               >
-                {isLast ? '' : 'Skip Tour'}
+                {isLast ? '' : 'Skip'}
               </button>
 
               <div className="flex-1" />
 
               <button
-                onClick={nextStep}
-                className="h-10 px-5 rounded-full bg-primary text-on-primary text-sm font-medium flex items-center gap-1.5 active:brightness-90 shadow-sm"
+                onClick={() => { clearTimers(); nextStep(); }}
+                className="h-9 px-4 rounded-full bg-primary text-on-primary text-xs font-medium flex items-center gap-1 active:brightness-90 shadow-sm"
               >
-                {isLast ? 'Start Cataloguing' : 'Next'}
-                {!isLast && <Icon name="chevron_right" size={16} className="text-on-primary" />}
+                {isLast ? 'Done' : 'Next'}
+                {!isLast && <Icon name="chevron_right" size={14} className="text-on-primary" />}
               </button>
             </div>
           </div>

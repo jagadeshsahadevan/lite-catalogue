@@ -11,19 +11,19 @@ const tabs = [
 export function MD3NavigationBar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { startTour } = useTour();
+  const { startPageTour, isActive } = useTour();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-frame safe-area-pb">
-      {/* Floating help button */}
-      <button
+      {/* Floating help button — hide during active tour */}
+      {!isActive && <button
         data-tour="help-btn"
-        onClick={startTour}
+        onClick={startPageTour}
         className="absolute -top-14 right-3 w-11 h-11 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center shadow-lg active:scale-95 transition-transform"
         title="Help & Guide"
       >
         <Icon name="help" size={22} />
-      </button>
+      </button>}
       <div className="flex h-16">
         {tabs.map((tab) => {
           const active = location.pathname.startsWith(tab.path);

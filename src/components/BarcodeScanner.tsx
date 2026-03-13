@@ -131,11 +131,13 @@ export function BarcodeScanner({ onScan }: Props) {
         <div className="text-on-surface-variant text-sm">Starting camera...</div>
       )}
 
-      {tipIndex >= 0 && (
-        <div className="w-full max-w-sm text-center text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-[var(--md-shape-sm)] animate-fade-in">
-          {SCANNING_TIPS[tipIndex].text}
-        </div>
-      )}
+      <div className="w-full max-w-sm min-h-[32px]">
+        {tipIndex >= 0 && (
+          <div className="text-center text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-[var(--md-shape-sm)]">
+            {SCANNING_TIPS[tipIndex].text}
+          </div>
+        )}
+      </div>
 
       <button
         data-tour="manual-barcode-btn"

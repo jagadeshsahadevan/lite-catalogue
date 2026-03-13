@@ -1,6 +1,7 @@
 import { useReducer, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
+import { useTour } from '../context/TourContext';
 import { useProducts } from '../hooks/useProducts';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { PhotoCapture } from '../components/PhotoCapture';
@@ -288,6 +289,7 @@ const SUPPRESS_DELETE_WARN_KEY = 'liteCat_suppressDeleteWarn';
 export function CapturePage() {
   const { settings } = useSettings();
   const { createProduct, replaceAllImages, getDuplicateInfo, getDistinctBrands, getDistinctCategories, getLastUsedBrand, getLastUsedCategory } = useProducts();
+  const { registerAutoScan } = useTour();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -357,6 +359,14 @@ export function CapturePage() {
       dispatch({ type: 'SCAN', barcode });
     }
   }, [getDuplicateInfo, settings.hapticFeedback]);
+
+  useEffect(() => {
+    registerAutoScan((barcode: string) => {
+      if (state.step === 'scanning') {
+        dispatch({ type: 'SCAN', barcode });
+      }
+    });
+  }, [registerAutoScan, state.step]);
 
   const handleCapture = useCallback(
     (blob: Blob) => {
